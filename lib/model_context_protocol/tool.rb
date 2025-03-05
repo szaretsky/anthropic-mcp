@@ -15,17 +15,52 @@ module ModelContextProtocol
       end
     end
 
+    class << self
+      attr_reader :description_value
+      attr_reader :input_schema_value
+
+      def inherited(subclass)
+        super
+        subclass.instance_variable_set(:@name_value, nil)
+        subclass.instance_variable_set(:@description_value, nil)
+        subclass.instance_variable_set(:@input_schema_value, nil)
+      end
+
+      def tool_name(value)
+        @name_value = value
+      end
+
+      def name_value
+        @name_value || name.demodulize.underscore
+      end
+
+      def description(value)
+        @description_value = value
+      end
+
+      def input_schema(value)
+        @input_schema_value = value
+      end
+
+      def define(name: nil, description: nil, input_schema: nil, &block)
+        new(name:, description:, input_schema:).tap do |tool|
+          tool.define_singleton_method(:call) do |*args|
+            instance_exec(*args, &block)
+          end
+        end
+      end
+    end
+
     attr_reader :name, :description, :input_schema
 
-    def initialize(name:, description: nil, input_schema: nil, &block)
-      @name = name
-      @description = description
-      @input_schema = input_schema
-      @tool_block = block_given? ? block : -> { Response.new([{ type: "text", content: "OK" }]) }
+    def initialize(name: nil, description: nil, input_schema: nil)
+      @name = name || self.class.name_value
+      @description = description || self.class.description_value
+      @input_schema = input_schema || self.class.input_schema_value
     end
 
     def call(*args)
-      @tool_block.call(*args)
+      raise NotImplementedError, "Subclasses must implement call"
     end
 
     def to_h

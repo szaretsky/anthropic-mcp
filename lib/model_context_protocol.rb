@@ -7,6 +7,7 @@ require "model_context_protocol/tool"
 require "model_context_protocol/content"
 require "model_context_protocol/resource"
 require "model_context_protocol/prompt"
+require "model_context_protocol/version"
 
 module ModelContextProtocol
   class Annotations

@@ -44,19 +44,59 @@ module ModelContextProtocol
       end
     end
 
+    class << self
+      attr_reader :description_value
+      attr_reader :arguments_value
+
+      def inherited(subclass)
+        super
+        subclass.instance_variable_set(:@name_value, nil)
+        subclass.instance_variable_set(:@description_value, nil)
+        subclass.instance_variable_set(:@arguments_value, nil)
+      end
+
+      def prompt_name(value)
+        @name_value = value
+      end
+
+      def name_value
+        @name_value || name.demodulize.underscore
+      end
+
+      def description(value)
+        @description_value = value
+      end
+
+      def arguments(value)
+        @arguments_value = value
+      end
+
+      def define(name: nil, description: nil, arguments: [], &block)
+        new(name:, description:, arguments:).tap do |prompt|
+          prompt.define_singleton_method(:template) do |args|
+            instance_exec(args, &block)
+          end
+        end
+      end
+    end
+
     attr_reader :name, :description, :arguments
 
-    def initialize(name:, description: nil, arguments: [], &block)
-      @name = name
-      @description = description
-      @arguments = arguments
-      @template_block = block
+    def initialize(name: nil, description: nil, arguments: nil)
+      @name = name || self.class.name_value
+      @description = description || self.class.description_value
+      @arguments = arguments || self.class.arguments_value
     end
 
     def template(args)
-      validate_args!(args)
-      result = @template_block.call(args)
-      result
+      raise NotImplementedError, "Prompt subclasses must implement template"
+    end
+
+    def validate_arguments!(args)
+      missing = required_args - args.keys
+      return if missing.empty?
+
+      raise ArgumentError, "Missing required arguments: #{missing.join(", ")}"
     end
 
     def to_h
@@ -67,13 +107,6 @@ module ModelContextProtocol
 
     def required_args
       arguments.filter_map { |arg| arg.name if arg.required }
-    end
-
-    def validate_args!(args)
-      missing = required_args - args.keys
-      return if missing.empty?
-
-      raise ArgumentError, "Missing required arguments: #{missing.join(", ")}"
     end
   end
 end

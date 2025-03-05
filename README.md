@@ -59,43 +59,117 @@ end
 
 MCP spec includes [Tools](https://modelcontextprotocol.io/docs/concepts/tools) which provide functionality to LLM apps.
 
-This gem provides a `ModelContextProtocol::Tool` class that can be instantiated to create tools.
+This gem provides a `ModelContextProtocol::Tool` class that can be used to create tools in two ways:
 
-Tools can be passed into the `ModelContextProtocol::Server` constructor to register them with the server.
-
-### Example Tool Implementation
-
-The `Tool` class allows creating tools that can be used within the model context.
-To create a tool, instantiate the class with the required parameters and an optional block:
-
+1. As a class definition:
 ```ruby
-tool = ModelContextProtocol::Tool.new(name: "my_tool", description: "This tool performs specific functionality...") do |args|
-  # Implement the tool's functionality here
-  result = process_something(args["parameter_name"])
-  ModelContextProtocol::Tool::Response.new([{ type: "text", text: result }], false )
+class MyTool < ModelContextProtocol::Tool
+  tool_name "my_tool"
+  tool_description "This tool performs specific functionality..."
+  tool_input_schema [{ type: "text", name: "message" }]
+
+  def call(message)
+    Tool::Response.new([{ type: "text", content: "OK" }])
+  end
+end
+
+tool = MyTool.new
+```
+
+2. By using the `ModelContextProtocol::Tool.define` method with a block:
+```ruby
+tool = ModelContextProtocol::Tool.define(name: "my_tool", description: "This tool performs specific functionality...") do |args|
+  Tool::Response.new([{ type: "text", content: "OK" }])
 end
 ```
 
 ## Prompts
 
-MCP spec includes
-[Prompts](https://modelcontextprotocol.io/docs/concepts/prompts), `Prompts` enable servers to define reusable prompt
-templates and workflows that clients can easily surface to users and LLMs
+MCP spec includes [Prompts](https://modelcontextprotocol.io/docs/concepts/prompts), which enable servers to define reusable prompt templates and workflows that clients can easily surface to users and LLMs.
 
-The `Prompt` class allows creating prompts that can be used within the model context.
+The `ModelContextProtocol::Prompt` class provides two ways to create prompts:
 
-To create a prompt, instantiate the class with the required parameters and an optional block:
-
+1. As a class definition with metadata:
 ```ruby
-prompt = ModelContextProtocol::Prompt.new(name: "my_prompt", description: "This prompt performs specific functionality...") do |args|
-  # Implement the prompt's functionality here
-  result = template_something(args["parameter_name"])
-  ModelContextProtocol::Prompt::Response.new([{ type: "text", text: result }], false )
+class MyPrompt < ModelContextProtocol::Prompt
+  prompt_name "my_prompt"  # Optional - defaults to underscored class name
+  description "This prompt performs specific functionality..."
+  arguments [
+    Prompt::Argument.new(
+      name: "message",
+      description: "Input message",
+      required: true
+    )
+  ]
+
+  def template(args)
+    Prompt::Result.new(
+      description: "Response description",
+      messages: [
+        Prompt::Message.new(
+          role: "user",
+          content: Content::Text.new("User message")
+        ),
+        Prompt::Message.new(
+          role: "assistant",
+          content: Content::Text.new(args["message"])
+        )
+      ]
+    )
+  end
 end
 ```
 
+2. Using the `ModelContextProtocol::Prompt.define` method:
+```ruby
+prompt = ModelContextProtocol::Prompt.define(
+  name: "my_prompt",
+  description: "This prompt performs specific functionality...",
+  arguments: [
+    Prompt::Argument.new(
+      name: "message",
+      description: "Input message",
+      required: true
+    )
+  ]
+) do |args|
+  Prompt::Result.new(
+    description: "Response description",
+    messages: [
+      Prompt::Message.new(
+        role: "user",
+        content: Content::Text.new("User message")
+      ),
+      Prompt::Message.new(
+        role: "assistant",
+        content: Content::Text.new(args["message"])
+      )
+    ]
+  )
+end
+```
 
+### Key Components
 
+- `Prompt::Argument` - Defines input parameters for the prompt template
+- `Prompt::Message` - Represents a message in the conversation with a role and content
+- `Prompt::Result` - The output of a prompt template containing description and messages
+- `Content::Text` - Text content for messages
+
+### Usage
+
+Register prompts with the MCP server:
+
+```ruby
+server = ModelContextProtocol::Server.new(
+  name: "my_server",
+  prompts: [MyPrompt.new]
+)
+```
+
+The server will handle prompt listing and execution through the MCP protocol methods:
+- `prompts/list` - Lists all registered prompts and their schemas
+- `prompts/get` - Retrieves and executes a specific prompt with arguments
 
 ## Releases
 
