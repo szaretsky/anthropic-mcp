@@ -62,6 +62,7 @@ MCP spec includes [Tools](https://modelcontextprotocol.io/docs/concepts/tools) w
 This gem provides a `ModelContextProtocol::Tool` class that can be used to create tools in two ways:
 
 1. As a class definition:
+
 ```ruby
 class MyTool < ModelContextProtocol::Tool
   tool_name "my_tool"
@@ -77,6 +78,7 @@ tool = MyTool.new
 ```
 
 2. By using the `ModelContextProtocol::Tool.define` method with a block:
+
 ```ruby
 tool = ModelContextProtocol::Tool.define(name: "my_tool", description: "This tool performs specific functionality...") do |args|
   Tool::Response.new([{ type: "text", content: "OK" }])
@@ -90,6 +92,7 @@ MCP spec includes [Prompts](https://modelcontextprotocol.io/docs/concepts/prompt
 The `ModelContextProtocol::Prompt` class provides two ways to create prompts:
 
 1. As a class definition with metadata:
+
 ```ruby
 class MyPrompt < ModelContextProtocol::Prompt
   prompt_name "my_prompt"  # Optional - defaults to underscored class name
@@ -121,6 +124,7 @@ end
 ```
 
 2. Using the `ModelContextProtocol::Prompt.define` method:
+
 ```ruby
 prompt = ModelContextProtocol::Prompt.define(
   name: "my_prompt",
@@ -168,6 +172,7 @@ server = ModelContextProtocol::Server.new(
 ```
 
 The server will handle prompt listing and execution through the MCP protocol methods:
+
 - `prompts/list` - Lists all registered prompts and their schemas
 - `prompts/get` - Retrieves and executes a specific prompt with arguments
 

@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "json_rpc_handler"
+
 module ModelContextProtocol
   class Server
     PROTOCOL_VERSION = "2024-11-05"
@@ -26,20 +28,20 @@ module ModelContextProtocol
     end
 
     def handle(request)
-      response = begin
-        parsed_request = JsonRPC::Request.parse(request)
-        parsed_request.validate!
-
-        if parsed_request.notification?
-          handle_notification(parsed_request)
+      JsonRpcHandler.handle(request) do |method|
+        handler = case method
+        when "tools/list"
+          ->(params) { { tools: @handlers["tools/list"].call(params) } }
+        when "prompts/list"
+          ->(params) { { prompts: @handlers["prompts/list"].call(params) } }
+        when "resources/list"
+          ->(params) { { resources: @handlers["resources/list"].call(params) } }
         else
-          handle_method(parsed_request)
+          @handlers[method]
         end
-      rescue JsonRPC::Error => e
-        JsonRPC::Response.new(id: parsed_request&.id, error: e)
-      end
 
-      response
+        handler
+      end
     end
 
     def resources_list_handler(&block)
@@ -86,29 +88,6 @@ module ModelContextProtocol
       }
     end
 
-    def handle_notification(request)
-      nil
-    end
-
-    def handle_method(request)
-      request_handler = @handlers[request.method]
-      raise JsonRPC::MethodNotFoundError.new(message: "Method not found #{request.method}") unless request_handler
-
-      result = request_handler.call(request)
-      wrapped_result = case request.method
-      when "tools/list"
-        { tools: result }
-      when "prompts/list"
-        { prompts: result }
-      when "resources/list"
-        { resources: result }
-      else
-        result
-      end
-
-      JsonRPC::Response.new(id: request.id, result: wrapped_result)
-    end
-
     def init(request)
       {
         protocolVersion: PROTOCOL_VERSION,
@@ -121,24 +100,17 @@ module ModelContextProtocol
       "pong"
     end
 
-    def call_tool(request)
-      tool_name = request.params&.dig("name")
-      tool = tools[tool_name]
-      raise JsonRPC::MethodNotFoundError.new(message: "Tool not found #{tool_name}") unless tool
-
-      tool_args = request.params&.dig("arguments")
-
-      result = begin
-        tool.call(**tool_args)
-      rescue => e
-        raise JsonRPC::InternalError.new(message: e.message)
-      end
-
-      result.to_h
-    end
-
     def list_tools(request)
       @tools.map { |_, tool| tool.to_h }
+    end
+
+    def call_tool(request)
+      tool_name = request[:name]
+      tool = tools[tool_name]
+      raise "Tool not found #{tool_name}" unless tool
+
+      result = tool.call(**request[:arguments])
+      result.to_h
     end
 
     def list_prompts(request)
@@ -146,18 +118,15 @@ module ModelContextProtocol
     end
 
     def get_prompt(request)
-      prompt_name = request.params&.dig("name")
+      prompt_name = request[:name]
       prompt = @prompts[prompt_name]
-      raise JsonRPC::MethodNotFoundError.new(message: "Prompt not found #{prompt_name}") unless prompt
 
-      begin
-        prompt_args = request.params&.dig("arguments")
-        prompt.validate_arguments!(prompt_args)
+      raise "Prompt not found #{prompt_name}" unless prompt
 
-        result = prompt.template(prompt_args)
-      rescue ArgumentError => e
-        raise JsonRPC::InvalidParamsError.new(message: e.message)
-      end
+      prompt_args = request[:arguments]
+      prompt.validate_arguments!(prompt_args)
+
+      result = prompt.template(prompt_args)
 
       result.to_h
     end
@@ -167,10 +136,10 @@ module ModelContextProtocol
     end
 
     def read_resource(request)
-      resource_uri = request.params&.dig("uri")
+      resource_uri = request[:uri]
 
       resource = @resource_index[resource_uri]
-      raise JsonRPC::MethodNotFoundError.new(message: "Resource not found #{resource_uri}") unless resource
+      raise "Resource not found #{resource_uri}" unless resource
 
       resource.to_h
     end

@@ -1,8 +1,8 @@
 PATH
   remote: .
   specs:
-    model_context_protocol (0.2.2)
-      activesupport
+    model_context_protocol (0.2.4)
+      json_rpc_handler (~> 0.1)
 
 GEM
   remote: https://rubygems.org/
@@ -32,6 +32,7 @@ GEM
     i18n (1.14.7)
       concurrent-ruby (~> 1.0)
     json (2.11.3)
+    json_rpc_handler (0.1.1)
     language_server-protocol (3.17.0.4)
     lint_roller (1.1.0)
     logger (1.7.0)

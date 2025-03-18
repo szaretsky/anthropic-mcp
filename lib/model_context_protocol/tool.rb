@@ -31,7 +31,7 @@ module ModelContextProtocol
       end
 
       def name_value
-        @name_value || name.demodulize.underscore
+        @name_value || StringUtils.handle_from_class_name(name)
       end
 
       def description(value)

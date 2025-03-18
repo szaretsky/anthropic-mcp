@@ -1,8 +1,8 @@
 # typed: strict
 # frozen_string_literal: true
 
-require "model_context_protocol/json_rpc"
 require "model_context_protocol/server"
+require "model_context_protocol/string_utils"
 require "model_context_protocol/tool"
 require "model_context_protocol/content"
 require "model_context_protocol/resource"

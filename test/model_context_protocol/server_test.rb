@@ -39,13 +39,13 @@ module ModelContextProtocol
         jsonrpc: "2.0",
         method: "ping",
         id: 1,
-      }.to_json
+      }
 
       response = @server.handle(request)
       refute_nil response
 
-      assert_equal "pong", response.result
-      assert_equal 1, response.id
+      assert_equal "pong", response[:result]
+      assert_equal 1, response[:id]
     end
 
     test "#handle initialize request returns protocol info, server info, and capabilities" do
@@ -53,13 +53,12 @@ module ModelContextProtocol
         jsonrpc: "2.0",
         method: "initialize",
         id: 1,
-      }.to_json
+      }
 
       response = @server.handle(request)
       refute_nil response
 
-      result = response.result
-
+      result = response[:result]
       assert_equal Server::PROTOCOL_VERSION, result[:protocolVersion]
       assert_kind_of Hash, result[:capabilities]
       assert_equal @server_name, result[:serverInfo][:name]
@@ -70,15 +69,9 @@ module ModelContextProtocol
       request = {
         jsonrpc: "2.0",
         method: "some_notification",
-      }.to_json
+      }
 
       assert_nil @server.handle(request)
-    end
-
-    test "#handle returns error response for invalid requests" do
-      response = @server.handle("invalid json")
-      assert_instance_of JsonRPC::Response, response
-      assert_instance_of(JsonRPC::ParseError, response.error)
     end
 
     test "#handle tools/list returns available tools" do
@@ -86,13 +79,14 @@ module ModelContextProtocol
         jsonrpc: "2.0",
         method: "tools/list",
         id: 1,
-      }.to_json
+      }
 
       response = @server.handle(request)
-      assert_kind_of Array, response.result[:tools]
-      assert_equal "test_tool", response.result[:tools][0][:name]
-      assert_equal "Test tool", response.result[:tools][0][:description]
-      assert_equal({}, response.result[:tools][0][:inputSchema])
+      result = response[:result]
+      assert_kind_of Array, result[:tools]
+      assert_equal "test_tool", result[:tools][0][:name]
+      assert_equal "Test tool", result[:tools][0][:description]
+      assert_equal({}, result[:tools][0][:inputSchema])
     end
 
     test "#tools_list_handler sets the tools/list handler" do
@@ -104,10 +98,11 @@ module ModelContextProtocol
         jsonrpc: "2.0",
         method: "tools/list",
         id: 1,
-      }.to_json
+      }
 
       response = @server.handle(request)
-      assert_equal({ tools: [{ name: "hammer", description: "Hammer time!" }] }, response.result)
+      result = response[:result]
+      assert_equal({ tools: [{ name: "hammer", description: "Hammer time!" }] }, result)
     end
 
     test "#handle tools/call executes tool and returns result" do
@@ -125,10 +120,10 @@ module ModelContextProtocol
           arguments: tool_args,
         },
         id: 1,
-      }.to_json
+      }
 
       response = @server.handle(request)
-      assert_equal tool_response.to_h, response.result
+      assert_equal tool_response.to_h, response[:result]
     end
 
     test "#handle tools/call returns error if the tool raises an error" do
@@ -142,12 +137,12 @@ module ModelContextProtocol
           arguments: {},
         },
         id: 1,
-      }.to_json
+      }
 
       response = @server.handle(request)
 
-      assert_instance_of(JsonRPC::InternalError, response.error)
-      assert_equal "Tool error", response.error&.message
+      assert_equal "Internal error", response[:error][:message]
+      assert_equal "Tool error", response[:error][:data]
     end
 
     test "#handle tools/call returns error for unknown tool" do
@@ -159,16 +154,16 @@ module ModelContextProtocol
           arguments: {},
         },
         id: 1,
-      }.to_json
+      }
 
       response = @server.handle(request)
-      assert_instance_of(JsonRPC::Response, response)
-      assert_instance_of(JsonRPC::MethodNotFoundError, response.error)
+      assert_equal "Internal error", response[:error][:message]
+      assert_equal "Tool not found unknown_tool", response[:error][:data]
     end
 
     test "#tools_call_handler sets the tools/call handler" do
       @server.tools_call_handler do |request|
-        tool_name = request.params&.dig("name")
+        tool_name = request[:name]
         return Tool::Response.new("#{tool_name} called successfully").to_h
       end
 
@@ -177,10 +172,10 @@ module ModelContextProtocol
         method: "tools/call",
         params: { name: "my_tool", arguments: {} },
         id: 1,
-      }.to_json
+      }
 
       response = @server.handle(request)
-      assert_equal({ content: "my_tool called successfully", is_error: false }, response.result)
+      assert_equal({ content: "my_tool called successfully", is_error: false }, response[:result])
     end
 
     test "#handle prompts/list returns list of prompts" do
@@ -188,10 +183,10 @@ module ModelContextProtocol
         jsonrpc: "2.0",
         method: "prompts/list",
         id: 1,
-      }.to_json
+      }
 
       response = @server.handle(request)
-      assert_equal({ prompts: [@prompt.to_h] }, response.result)
+      assert_equal({ prompts: [@prompt.to_h] }, response[:result])
     end
 
     test "#prompts_list_handler sets the prompts/list handler" do
@@ -203,10 +198,10 @@ module ModelContextProtocol
         jsonrpc: "2.0",
         method: "prompts/list",
         id: 1,
-      }.to_json
+      }
 
       response = @server.handle(request)
-      assert_equal({ prompts: [{ name: "foo_prompt", description: "Foo prompt" }] }, response.result)
+      assert_equal({ prompts: [{ name: "foo_prompt", description: "Foo prompt" }] }, response[:result])
     end
 
     test "#handle prompts/get returns templated prompt" do
@@ -218,7 +213,7 @@ module ModelContextProtocol
           name: "test_prompt",
           arguments: { "test_argument" => "Hello, friend!" },
         },
-      }.to_json
+      }
 
       expected_result = {
         description: "Hello, world!",
@@ -228,8 +223,7 @@ module ModelContextProtocol
       }
 
       response = @server.handle(request)
-
-      assert_equal(expected_result, response.result)
+      assert_equal(expected_result, response[:result])
     end
 
     test "#handle prompts/get returns error if prompt is not found" do
@@ -241,11 +235,10 @@ module ModelContextProtocol
           name: "unknown_prompt",
           arguments: {},
         },
-      }.to_json
+      }
 
       response = @server.handle(request)
-      assert_instance_of(JsonRPC::Response, response)
-      assert_instance_of(JsonRPC::MethodNotFoundError, response.error)
+      assert_equal("Prompt not found unknown_prompt", response[:error][:data])
     end
 
     test "#handle prompts/get returns error if prompt arguments are invalid" do
@@ -257,21 +250,19 @@ module ModelContextProtocol
           name: "test_prompt",
           arguments: { "unknown_argument" => "Hello, friend!" },
         },
-      }.to_json
+      }
 
       response = @server.handle(request)
-      assert_instance_of(JsonRPC::Response, response)
-      assert_instance_of(JsonRPC::InvalidParamsError, response.error)
-      assert_equal "Missing required arguments: test_argument", response.error.message
+      assert_equal "Missing required arguments: test_argument", response[:error][:data]
     end
 
     test "#prompts_get_handler sets the prompts/get handler" do
       @server.prompts_get_handler do |request|
-        prompt_name = request.params&.dig("name")
+        prompt_name = request[:name]
         return Prompt::Result.new(
           description: prompt_name,
           messages: [
-            Prompt::Message.new(role: "user", content: Content::Text.new(request.params&.dig("arguments", "foo"))),
+            Prompt::Message.new(role: "user", content: Content::Text.new(request[:arguments][:foo])),
           ],
         ).to_h
       end
@@ -281,12 +272,12 @@ module ModelContextProtocol
         method: "prompts/get",
         id: 1,
         params: { name: "foo_bar_prompt", arguments: { "foo" => "bar" } },
-      }.to_json
+      }
 
       response = @server.handle(request)
       assert_equal(
         { description: "foo_bar_prompt", messages: [{ role: "user", content: { text: "bar" } }] },
-        response.result,
+        response[:result],
       )
     end
 
@@ -295,10 +286,10 @@ module ModelContextProtocol
         jsonrpc: "2.0",
         method: "resources/list",
         id: 1,
-      }.to_json
+      }
 
       response = @server.handle(request)
-      assert_equal({ resources: [@resource.to_h] }, response.result)
+      assert_equal({ resources: [@resource.to_h] }, response[:result])
     end
 
     test "#resources_list_handler sets the resources/list handler" do
@@ -310,12 +301,12 @@ module ModelContextProtocol
         jsonrpc: "2.0",
         method: "resources/list",
         id: 1,
-      }.to_json
+      }
 
       response = @server.handle(request)
       assert_equal(
         { resources: [{ uri: "test_resource", name: "Test resource", description: "Test resource" }] },
-        response.result,
+        response[:result],
       )
     end
 
@@ -327,10 +318,10 @@ module ModelContextProtocol
         params: {
           uri: @resource.uri,
         },
-      }.to_json
+      }
 
       response = @server.handle(request)
-      assert_equal(@resource.to_h, response.result)
+      assert_equal(@resource.to_h, response[:result])
     end
 
     test "#handle resources/read returns error if resource is not found" do
@@ -341,16 +332,15 @@ module ModelContextProtocol
         params: {
           uri: "unknown_resource",
         },
-      }.to_json
+      }
 
       response = @server.handle(request)
-      assert_instance_of(JsonRPC::Response, response)
-      assert_equal "Resource not found unknown_resource", response.error.message
+      assert_equal "Resource not found unknown_resource", response[:error][:data]
     end
 
     test "#resources_read_handler sets the resources/read handler" do
       @server.resources_read_handler do |request|
-        uri = request.params&.dig("uri")
+        uri = request[:uri]
 
         Resource.new(
           uri: uri,
@@ -368,7 +358,7 @@ module ModelContextProtocol
         params: {
           uri: "test_resource",
         },
-      }.to_json
+      }
 
       response = @server.handle(request)
       assert_equal(
@@ -379,7 +369,7 @@ module ModelContextProtocol
           mimeType: "text/plain",
           contents: [{ text: "Lorem ipsum dolor sit amet" }],
         },
-        response.result,
+        response[:result],
       )
     end
 
@@ -388,11 +378,12 @@ module ModelContextProtocol
         jsonrpc: "2.0",
         id: 1,
         method: "unknown_method",
-      }.to_json
+      }
 
       response = @server.handle(request)
-      assert_instance_of(JsonRPC::Response, response)
-      assert_instance_of(JsonRPC::MethodNotFoundError, response.error)
+
+      assert_equal "Method not found", response[:error][:message]
+      assert_equal "unknown_method", response[:error][:data]
     end
   end
 end
