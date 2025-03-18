@@ -34,18 +34,23 @@ module ModelContextProtocol
       @server = Server.new(name: @server_name, tools: [@tool], prompts: [@prompt], resources: [@resource])
     end
 
-    test "#handle ping request returns pong" do
+    # https://spec.modelcontextprotocol.io/specification/2024-11-05/basic/utilities/ping/#behavior-requirements
+    test "#handle ping request returns empty response" do
       request = {
         jsonrpc: "2.0",
         method: "ping",
-        id: 1,
+        id: "123",
       }
 
       response = @server.handle(request)
-      refute_nil response
-
-      assert_equal "pong", response[:result]
-      assert_equal 1, response[:id]
+      assert_equal(
+        {
+          "jsonrpc": "2.0",
+          "id": "123",
+          "result": {},
+        },
+        response,
+      )
     end
 
     test "#handle initialize request returns protocol info, server info, and capabilities" do
@@ -58,11 +63,24 @@ module ModelContextProtocol
       response = @server.handle(request)
       refute_nil response
 
-      result = response[:result]
-      assert_equal Server::PROTOCOL_VERSION, result[:protocolVersion]
-      assert_kind_of Hash, result[:capabilities]
-      assert_equal @server_name, result[:serverInfo][:name]
-      assert_equal ModelContextProtocol::VERSION, result[:serverInfo][:version]
+      expected_result = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "prompts": {},
+            "resources": {},
+            "tools": {},
+          },
+          "serverInfo": {
+            "name": @server_name,
+            "version": ModelContextProtocol::VERSION,
+          },
+        },
+      }
+
+      assert_equal expected_result, response
     end
 
     test "#handle returns nil for notification requests" do

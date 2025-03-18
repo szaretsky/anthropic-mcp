@@ -23,7 +23,7 @@ module ModelContextProtocol
         "prompts/list" => method(:list_prompts),
         "prompts/get" => method(:get_prompt),
         "initialize" => method(:init),
-        "ping" => method(:ping),
+        "ping" => ->(_) { {} },
       }
     end
 
@@ -72,13 +72,10 @@ module ModelContextProtocol
 
     def capabilities
       @capabilities ||= {
-        experimental: nil,
-        logging: nil,
-        prompts: nil,
-        resources: nil,
+        prompts: {},
+        resources: {},
         tools: {},
-        model_config: nil,
-      }.compact
+      }
     end
 
     def server_info
@@ -94,10 +91,6 @@ module ModelContextProtocol
         capabilities: capabilities,
         serverInfo: server_info,
       }
-    end
-
-    def ping(request)
-      "pong"
     end
 
     def list_tools(request)
