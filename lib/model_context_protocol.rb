@@ -8,8 +8,19 @@ require "model_context_protocol/content"
 require "model_context_protocol/resource"
 require "model_context_protocol/prompt"
 require "model_context_protocol/version"
+require "model_context_protocol/configuration"
 
 module ModelContextProtocol
+  class << self
+    def configure
+      yield(configuration)
+    end
+
+    def configuration
+      @configuration ||= Configuration.new
+    end
+  end
+
   class Annotations
     attr_reader :audience, :priority
 

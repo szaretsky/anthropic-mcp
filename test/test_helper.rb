@@ -13,6 +13,8 @@ require "mocha/minitest"
 require "active_support"
 require "active_support/test_case"
 
+require_relative "instrumentation_test_helper"
+
 Minitest::Reporters.use!(Minitest::Reporters::ProgressReporter.new)
 
 module ActiveSupport

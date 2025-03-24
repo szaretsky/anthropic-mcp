@@ -4,6 +4,7 @@ require "test_helper"
 
 module ModelContextProtocol
   class ServerTest < ActiveSupport::TestCase
+    include InstrumentationTestHelper
     setup do
       @tool = Tool.new(name: "test_tool", description: "Test tool", input_schema: {})
 
@@ -31,7 +32,16 @@ module ModelContextProtocol
       )
 
       @server_name = "test_server"
-      @server = Server.new(name: @server_name, tools: [@tool], prompts: [@prompt], resources: [@resource])
+      ModelContextProtocol.configure do |config|
+        config.instrumentation_callback = instrumentation_helper.callback
+      end
+
+      @server = Server.new(
+        name: @server_name,
+        tools: [@tool],
+        prompts: [@prompt],
+        resources: [@resource],
+      )
     end
 
     # https://spec.modelcontextprotocol.io/specification/2024-11-05/basic/utilities/ping/#behavior-requirements
@@ -51,6 +61,7 @@ module ModelContextProtocol
         },
         response,
       )
+      assert_instrumentation_data({ method: "ping" })
     end
 
     test "#handle initialize request returns protocol info, server info, and capabilities" do
@@ -81,6 +92,7 @@ module ModelContextProtocol
       }
 
       assert_equal expected_result, response
+      assert_instrumentation_data({ method: "initialize" })
     end
 
     test "#handle returns nil for notification requests" do
@@ -90,6 +102,7 @@ module ModelContextProtocol
       }
 
       assert_nil @server.handle(request)
+      assert_instrumentation_data({ method: "some_notification" })
     end
 
     test "#handle tools/list returns available tools" do
@@ -105,6 +118,7 @@ module ModelContextProtocol
       assert_equal "test_tool", result[:tools][0][:name]
       assert_equal "Test tool", result[:tools][0][:description]
       assert_equal({}, result[:tools][0][:inputSchema])
+      assert_instrumentation_data({ method: "tools/list" })
     end
 
     test "#tools_list_handler sets the tools/list handler" do
@@ -121,6 +135,7 @@ module ModelContextProtocol
       response = @server.handle(request)
       result = response[:result]
       assert_equal({ tools: [{ name: "hammer", description: "Hammer time!" }] }, result)
+      assert_instrumentation_data({ method: "tools/list" })
     end
 
     test "#handle tools/call executes tool and returns result" do
@@ -128,7 +143,7 @@ module ModelContextProtocol
       tool_args = { "arg" => "value" }
       tool_response = Tool::Response.new([{ "result" => "success" }])
 
-      @tool.expects(:call).with(**tool_args).returns(tool_response)
+      @tool.expects(:call).with(**tool_args, context: @server.context).returns(tool_response)
 
       request = {
         jsonrpc: "2.0",
@@ -142,10 +157,20 @@ module ModelContextProtocol
 
       response = @server.handle(request)
       assert_equal tool_response.to_h, response[:result]
+      assert_instrumentation_data({ method: "tools/call", tool_name: })
     end
 
-    test "#handle tools/call returns error if the tool raises an error" do
-      @tool.expects(:call).raises(StandardError.new("Tool error"))
+    test "#handle tools/call returns internal error and reports exception if the tool raises an error" do
+      exception = StandardError.new("Tool error")
+      @tool.expects(:call).raises(exception)
+
+      ModelContextProtocol.configuration.exception_reporter.expects(:call).with(
+        exception,
+        {
+          tool_name: "test_tool",
+          arguments: {},
+        },
+      )
 
       request = {
         jsonrpc: "2.0",
@@ -160,7 +185,8 @@ module ModelContextProtocol
       response = @server.handle(request)
 
       assert_equal "Internal error", response[:error][:message]
-      assert_equal "Tool error", response[:error][:data]
+      assert_equal "Internal error calling tool test_tool", response[:error][:data]
+      assert_instrumentation_data({ method: "tools/call", tool_name: "test_tool", error: :internal_error })
     end
 
     test "#handle tools/call returns error for unknown tool" do
@@ -177,6 +203,7 @@ module ModelContextProtocol
       response = @server.handle(request)
       assert_equal "Internal error", response[:error][:message]
       assert_equal "Tool not found unknown_tool", response[:error][:data]
+      assert_instrumentation_data({ method: "tools/call", error: :tool_not_found })
     end
 
     test "#tools_call_handler sets the tools/call handler" do
@@ -194,6 +221,7 @@ module ModelContextProtocol
 
       response = @server.handle(request)
       assert_equal({ content: "my_tool called successfully", is_error: false }, response[:result])
+      assert_instrumentation_data({ method: "tools/call", tool_name: "my_tool" })
     end
 
     test "#handle prompts/list returns list of prompts" do
@@ -205,6 +233,7 @@ module ModelContextProtocol
 
       response = @server.handle(request)
       assert_equal({ prompts: [@prompt.to_h] }, response[:result])
+      assert_instrumentation_data({ method: "prompts/list" })
     end
 
     test "#prompts_list_handler sets the prompts/list handler" do
@@ -220,6 +249,7 @@ module ModelContextProtocol
 
       response = @server.handle(request)
       assert_equal({ prompts: [{ name: "foo_prompt", description: "Foo prompt" }] }, response[:result])
+      assert_instrumentation_data({ method: "prompts/list" })
     end
 
     test "#handle prompts/get returns templated prompt" do
@@ -242,6 +272,7 @@ module ModelContextProtocol
 
       response = @server.handle(request)
       assert_equal(expected_result, response[:result])
+      assert_instrumentation_data({ method: "prompts/get", prompt_name: "test_prompt" })
     end
 
     test "#handle prompts/get returns error if prompt is not found" do
@@ -257,6 +288,7 @@ module ModelContextProtocol
 
       response = @server.handle(request)
       assert_equal("Prompt not found unknown_prompt", response[:error][:data])
+      assert_instrumentation_data({ method: "prompts/get", error: :prompt_not_found })
     end
 
     test "#handle prompts/get returns error if prompt arguments are invalid" do
@@ -272,6 +304,7 @@ module ModelContextProtocol
 
       response = @server.handle(request)
       assert_equal "Missing required arguments: test_argument", response[:error][:data]
+      assert_instrumentation_data({ method: "prompts/get", prompt_name: "test_prompt" })
     end
 
     test "#prompts_get_handler sets the prompts/get handler" do
@@ -297,6 +330,7 @@ module ModelContextProtocol
         { description: "foo_bar_prompt", messages: [{ role: "user", content: { text: "bar" } }] },
         response[:result],
       )
+      assert_instrumentation_data({ method: "prompts/get", prompt_name: "foo_bar_prompt" })
     end
 
     test "#handle resources/list returns a list of resources" do
@@ -308,6 +342,7 @@ module ModelContextProtocol
 
       response = @server.handle(request)
       assert_equal({ resources: [@resource.to_h] }, response[:result])
+      assert_instrumentation_data({ method: "resources/list" })
     end
 
     test "#resources_list_handler sets the resources/list handler" do
@@ -326,6 +361,7 @@ module ModelContextProtocol
         { resources: [{ uri: "test_resource", name: "Test resource", description: "Test resource" }] },
         response[:result],
       )
+      assert_instrumentation_data({ method: "resources/list" })
     end
 
     test "#handle resources/read returns a resource" do
@@ -340,6 +376,7 @@ module ModelContextProtocol
 
       response = @server.handle(request)
       assert_equal(@resource.to_h, response[:result])
+      assert_instrumentation_data({ method: "resources/read", resource_uri: @resource.uri })
     end
 
     test "#handle resources/read returns error if resource is not found" do
@@ -354,6 +391,7 @@ module ModelContextProtocol
 
       response = @server.handle(request)
       assert_equal "Resource not found unknown_resource", response[:error][:data]
+      assert_instrumentation_data({ method: "resources/read", error: :resource_not_found })
     end
 
     test "#resources_read_handler sets the resources/read handler" do
@@ -389,6 +427,7 @@ module ModelContextProtocol
         },
         response[:result],
       )
+      assert_instrumentation_data({ method: "resources/read" })
     end
 
     test "#handle unknown method returns method not found error" do
@@ -402,6 +441,7 @@ module ModelContextProtocol
 
       assert_equal "Method not found", response[:error][:message]
       assert_equal "unknown_method", response[:error][:data]
+      assert_instrumentation_data({ method: "unknown_method" })
     end
   end
 end

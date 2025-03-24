@@ -1,20 +1,30 @@
 # frozen_string_literal: true
 
 require "json_rpc_handler"
+require_relative "instrumentation"
 
 module ModelContextProtocol
   class Server
+    class RequestHandlerError < StandardError
+      def initialize(message, request)
+        super(message)
+        @request = request
+      end
+    end
+
     PROTOCOL_VERSION = "2024-11-05"
 
-    attr_accessor :name, :tools, :prompts, :resources
+    include Instrumentation
 
-    def initialize(name: "model_context_protocol", tools: [], prompts: [], resources: [])
+    attr_accessor :name, :tools, :prompts, :resources, :context
+
+    def initialize(name: "model_context_protocol", tools: [], prompts: [], resources: [], context: nil)
       @name = name
       @tools = tools.to_h { |t| [t.name, t] }
       @prompts = prompts.to_h { |p| [p.name, p] }
       @resources = resources
       @resource_index = resources.index_by(&:uri)
-
+      @context = context
       @handlers = {
         "resources/list" => method(:list_resources),
         "resources/read" => method(:read_resource),
@@ -29,18 +39,21 @@ module ModelContextProtocol
 
     def handle(request)
       JsonRpcHandler.handle(request) do |method|
-        handler = case method
-        when "tools/list"
-          ->(params) { { tools: @handlers["tools/list"].call(params) } }
-        when "prompts/list"
-          ->(params) { { prompts: @handlers["prompts/list"].call(params) } }
-        when "resources/list"
-          ->(params) { { resources: @handlers["resources/list"].call(params) } }
-        else
-          @handlers[method]
+        instrument_call(method) do
+          case method
+          when "tools/list"
+            ->(params) { { tools: @handlers["tools/list"].call(params) } }
+          when "prompts/list"
+            ->(params) { { prompts: @handlers["prompts/list"].call(params) } }
+          when "resources/list"
+            ->(params) { { resources: @handlers["resources/list"].call(params) } }
+          else
+            @handlers[method]
+          end
+        rescue => e
+          report_exception(e, { request: request })
+          raise RequestHandlerError.new("Internal error handling #{request[:method]} request", request)
         end
-
-        handler
       end
     end
 
@@ -86,6 +99,7 @@ module ModelContextProtocol
     end
 
     def init(request)
+      add_instrumentation_data(method: "initialize")
       {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: capabilities,
@@ -94,47 +108,76 @@ module ModelContextProtocol
     end
 
     def list_tools(request)
+      add_instrumentation_data(method: "tools/list")
       @tools.map { |_, tool| tool.to_h }
     end
 
     def call_tool(request)
+      add_instrumentation_data(method: "tools/call")
       tool_name = request[:name]
       tool = tools[tool_name]
-      raise "Tool not found #{tool_name}" unless tool
+      unless tool
+        add_instrumentation_data(error: :tool_not_found)
+        raise "Tool not found #{tool_name}"
+      end
 
-      result = tool.call(**request[:arguments])
-      result.to_h
+      add_instrumentation_data(tool_name:)
+
+      begin
+        result = tool.call(**request[:arguments], context:)
+        result.to_h
+      rescue => e
+        report_exception(e, { tool_name: tool_name, arguments: request[:arguments] })
+        add_instrumentation_data(error: :internal_error)
+        raise RequestHandlerError.new("Internal error calling tool #{tool_name}", request)
+      end
     end
 
     def list_prompts(request)
+      add_instrumentation_data(method: "prompts/list")
       @prompts.map { |_, prompt| prompt.to_h }
     end
 
     def get_prompt(request)
+      add_instrumentation_data(method: "prompts/get")
       prompt_name = request[:name]
       prompt = @prompts[prompt_name]
+      unless prompt
+        add_instrumentation_data(error: :prompt_not_found)
+        raise "Prompt not found #{prompt_name}"
+      end
 
-      raise "Prompt not found #{prompt_name}" unless prompt
+      add_instrumentation_data(prompt_name:)
 
       prompt_args = request[:arguments]
       prompt.validate_arguments!(prompt_args)
 
-      result = prompt.template(prompt_args)
-
-      result.to_h
+      prompt.template(prompt_args).to_h
     end
 
     def list_resources(request)
+      add_instrumentation_data(method: "resources/list")
+
       @resources.map(&:to_h)
     end
 
     def read_resource(request)
+      add_instrumentation_data(method: "resources/read")
       resource_uri = request[:uri]
 
       resource = @resource_index[resource_uri]
-      raise "Resource not found #{resource_uri}" unless resource
+      unless resource
+        add_instrumentation_data(error: :resource_not_found)
+        raise "Resource not found #{resource_uri}"
+      end
+
+      add_instrumentation_data(resource_uri:)
 
       resource.to_h
+    end
+
+    def report_exception(exception, context = {})
+      ModelContextProtocol.configuration.exception_reporter.call(exception, context)
     end
   end
 end

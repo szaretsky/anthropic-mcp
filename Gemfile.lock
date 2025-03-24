@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    model_context_protocol (0.2.5)
+    model_context_protocol (0.3.0)
       json_rpc_handler (~> 0.1)
 
 GEM

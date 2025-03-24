@@ -44,8 +44,8 @@ module ModelContextProtocol
 
       def define(name: nil, description: nil, input_schema: nil, &block)
         new(name:, description:, input_schema:).tap do |tool|
-          tool.define_singleton_method(:call) do |*args|
-            instance_exec(*args, &block)
+          tool.define_singleton_method(:call) do |*args, context:|
+            instance_exec(*args, context:, &block)
           end
         end
       end
@@ -59,7 +59,7 @@ module ModelContextProtocol
       @input_schema = input_schema || self.class.input_schema_value
     end
 
-    def call(*args)
+    def call(*args, context:)
       raise NotImplementedError, "Subclasses must implement call"
     end
 

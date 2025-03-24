@@ -47,13 +47,49 @@ module ModelContextProtocol
       server = ModelContextProtocol::Server.new(
         name: "my_server",
         tools: [someTool, anotherTool],
-        prompts: [myPrompt]
+        prompts: [myPrompt],
+        context: nil,
       )
       render(json: server.handle(request.body.read).to_h)
     end
   end
 end
 ```
+
+## Configuration
+
+The gem can be configured using the `ModelContextProtocol.configure` block:
+
+```ruby
+ModelContextProtocol.configure do |config|
+  config.exception_reporter = ->(exception, context) do
+    # Your exception reporting logic here
+    # For example with Bugsnag:
+    Bugsnag.notify(exception) do |report|
+      report.add_metadata(:model_context_protocol, context)
+    end
+  end
+
+  config.instrumentation_callback = -> (data) { puts "Got instrumentation data #{data.inspect}" }
+end
+```
+
+### Exception Reporting
+
+The exception reporter receives two arguments:
+- `exception`: The Ruby exception object that was raised
+- `context`: A hash containing contextual information about where the error occurred
+
+The context hash includes:
+- For tool calls: `{ tool_name: "name", arguments: { ... } }`
+- For general request handling: `{ request: { ... } }`
+
+When an exception occurs:
+1. The exception is reported via the configured reporter
+2. For tool calls, a generic error response is returned to the client: `{ error: "Internal error occurred", is_error: true }`
+3. For other requests, the exception is re-raised after reporting
+
+If no exception reporter is configured, a default no-op reporter is used that silently ignores exceptions.
 
 ## Tools
 
@@ -65,11 +101,10 @@ This gem provides a `ModelContextProtocol::Tool` class that can be used to creat
 
 ```ruby
 class MyTool < ModelContextProtocol::Tool
-  tool_name "my_tool"
-  tool_description "This tool performs specific functionality..."
-  tool_input_schema [{ type: "text", name: "message" }]
+  description "This tool performs specific functionality..."
+  input_schema [{ type: "text", name: "message" }]
 
-  def call(message)
+  def call(message, context:)
     Tool::Response.new([{ type: "text", content: "OK" }])
   end
 end
@@ -80,10 +115,13 @@ tool = MyTool.new
 2. By using the `ModelContextProtocol::Tool.define` method with a block:
 
 ```ruby
-tool = ModelContextProtocol::Tool.define(name: "my_tool", description: "This tool performs specific functionality...") do |args|
+tool = ModelContextProtocol::Tool.define(name: "my_tool", description: "This tool performs specific functionality...") do |args, context|
   Tool::Response.new([{ type: "text", content: "OK" }])
 end
 ```
+
+The context parameter is the context passed into the server and can be used to pass per request information,
+e.g. around authentication state.
 
 ## Prompts
 
@@ -167,7 +205,8 @@ Register prompts with the MCP server:
 ```ruby
 server = ModelContextProtocol::Server.new(
   name: "my_server",
-  prompts: [MyPrompt.new]
+  prompts: [MyPrompt.new],
+  context: nil,
 )
 ```
 
@@ -175,6 +214,28 @@ The server will handle prompt listing and execution through the MCP protocol met
 
 - `prompts/list` - Lists all registered prompts and their schemas
 - `prompts/get` - Retrieves and executes a specific prompt with arguments
+
+### Instrumentation
+
+The server allows registering a callback to receive information about instrumentation.
+To register a handler pass a proc/lambda to as `instrumentation_callback` into the server constructor.
+
+```ruby
+ModelContextProtocol.configure do |config|
+  config.instrumentation_callback = -> (data) { puts "Got instrumentation data #{data.inspect}" }
+end
+```
+
+The data contains the following keys:
+`method`: the metod called, e.g. `ping`, `tools/list`, `tools/call` etc
+`tool_name`: the name of the tool called
+`prompt_name`: the name of the prompt called
+`resource_uri`: the uri of the resource called
+`error`: if looking up tools/prompts etc failed, e.g. `tool_not_found`
+`duration`: the duration of the call in seconds
+
+`tool_name`, `prompt_name` and `resource_uri` are only populated if a matching handler is registered.
+This is to avoid potential issues with metric cardinality
 
 ## Releases
 
