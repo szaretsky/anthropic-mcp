@@ -11,13 +11,23 @@ module ModelContextProtocol
       end
 
       def to_h
-        { content:, is_error: }.compact
+        { content:, isError: is_error }.compact
       end
     end
 
     class << self
+      NOT_SET = Object.new
+
       attr_reader :description_value
       attr_reader :input_schema_value
+
+      def call(*args, context:)
+        raise NotImplementedError, "Subclasses must implement call"
+      end
+
+      def to_h
+        { name: name_value, description: description_value, inputSchema: input_schema_value }
+      end
 
       def inherited(subclass)
         super
@@ -26,45 +36,44 @@ module ModelContextProtocol
         subclass.instance_variable_set(:@input_schema_value, nil)
       end
 
-      def tool_name(value)
-        @name_value = value
+      def tool_name(value = NOT_SET)
+        if value == NOT_SET
+          @name_value
+        else
+          @name_value = value
+        end
       end
 
       def name_value
         @name_value || StringUtils.handle_from_class_name(name)
       end
 
-      def description(value)
-        @description_value = value
+      def description(value = NOT_SET)
+        if value == NOT_SET
+          @description_value
+        else
+          @description_value = value
+        end
       end
 
-      def input_schema(value)
-        @input_schema_value = value
+      def input_schema(value = NOT_SET)
+        if value == NOT_SET
+          @input_schema_value
+        else
+          @input_schema_value = value
+        end
       end
 
       def define(name: nil, description: nil, input_schema: nil, &block)
-        new(name:, description:, input_schema:).tap do |tool|
-          tool.define_singleton_method(:call) do |*args, context:|
+        Class.new(self) do
+          tool_name name
+          description description
+          input_schema input_schema
+          define_singleton_method(:call) do |*args, context:|
             instance_exec(*args, context:, &block)
           end
         end
       end
-    end
-
-    attr_reader :name, :description, :input_schema
-
-    def initialize(name: nil, description: nil, input_schema: nil)
-      @name = name || self.class.name_value
-      @description = description || self.class.description_value
-      @input_schema = input_schema || self.class.input_schema_value
-    end
-
-    def call(*args, context:)
-      raise NotImplementedError, "Subclasses must implement call"
-    end
-
-    def to_h
-      { name:, description:, inputSchema: input_schema }
     end
   end
 end

@@ -20,8 +20,8 @@ module ModelContextProtocol
 
     def initialize(name: "model_context_protocol", tools: [], prompts: [], resources: [], context: nil)
       @name = name
-      @tools = tools.to_h { |t| [t.name, t] }
-      @prompts = prompts.to_h { |p| [p.name, p] }
+      @tools = tools.to_h { |t| [t.name_value, t] }
+      @prompts = prompts.to_h { |p| [p.name_value, p] }
       @resources = resources
       @resource_index = resources.index_by(&:uri)
       @context = context
@@ -39,21 +39,13 @@ module ModelContextProtocol
 
     def handle(request)
       JsonRpcHandler.handle(request) do |method|
-        instrument_call(method) do
-          case method
-          when "tools/list"
-            ->(params) { { tools: @handlers["tools/list"].call(params) } }
-          when "prompts/list"
-            ->(params) { { prompts: @handlers["prompts/list"].call(params) } }
-          when "resources/list"
-            ->(params) { { resources: @handlers["resources/list"].call(params) } }
-          else
-            @handlers[method]
-          end
-        rescue => e
-          report_exception(e, { request: request })
-          raise RequestHandlerError.new("Internal error handling #{request[:method]} request", request)
-        end
+        handle_request(request, method)
+      end
+    end
+
+    def handle_json(request)
+      JsonRpcHandler.handle_json(request) do |method|
+        handle_request(request, method)
       end
     end
 
@@ -82,6 +74,24 @@ module ModelContextProtocol
     end
 
     private
+
+    def handle_request(request, method)
+      instrument_call(method) do
+        case method
+        when "tools/list"
+          ->(params) { { tools: @handlers["tools/list"].call(params) } }
+        when "prompts/list"
+          ->(params) { { prompts: @handlers["prompts/list"].call(params) } }
+        when "resources/list"
+          ->(params) { { resources: @handlers["resources/list"].call(params) } }
+        else
+          @handlers[method]
+        end
+      rescue => e
+        report_exception(e, { request: request })
+        raise RequestHandlerError.new("Internal error handling #{request[:method]} request", request)
+      end
+    end
 
     def capabilities
       @capabilities ||= {
@@ -152,7 +162,7 @@ module ModelContextProtocol
       prompt_args = request[:arguments]
       prompt.validate_arguments!(prompt_args)
 
-      prompt.template(prompt_args).to_h
+      prompt.template(prompt_args, context:).to_h
     end
 
     def list_resources(request)
@@ -172,7 +182,6 @@ module ModelContextProtocol
       end
 
       add_instrumentation_data(resource_uri:)
-
       resource.to_h
     end
 

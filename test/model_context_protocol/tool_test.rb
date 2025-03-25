@@ -9,18 +9,20 @@ module ModelContextProtocol
       description "a test tool for testing"
       input_schema [{ type: "text", name: "message" }]
 
-      def call(message)
-        Tool::Response.new([{ type: "text", content: "OK" }])
+      class << self
+        def call(message)
+          Tool::Response.new([{ type: "text", content: "OK" }])
+        end
       end
     end
 
     test "#to_h returns a hash with name, description, and inputSchema" do
-      tool = Tool.new(name: "mock_tool", description: "a mock tool for testing")
+      tool = Tool.define(name: "mock_tool", description: "a mock tool for testing")
       assert_equal tool.to_h, { name: "mock_tool", description: "a mock tool for testing", inputSchema: nil }
     end
 
     test "#call invokes the tool block and returns the response" do
-      tool = TestTool.new
+      tool = TestTool
       response = tool.call("test")
       assert_equal response.content, [{ type: "text", content: "OK" }]
       assert_equal response.is_error, false
@@ -33,8 +35,8 @@ module ModelContextProtocol
         input_schema [{ type: "text", name: "message" }]
       end
 
-      tool = MockTool.new
-      assert_equal tool.name, "my_mock_tool"
+      tool = MockTool
+      assert_equal tool.name_value, "my_mock_tool"
       assert_equal tool.description, "a mock tool for testing"
       assert_equal tool.input_schema, [{ type: "text", name: "message" }]
     end
@@ -45,9 +47,9 @@ module ModelContextProtocol
         input_schema [{ type: "text", name: "message" }]
       end
 
-      tool = DefaultNameTool.new
+      tool = DefaultNameTool
 
-      assert_equal tool.name, "default_name_tool"
+      assert_equal tool.name_value, "default_name_tool"
       assert_equal tool.description, "a mock tool for testing"
       assert_equal tool.input_schema, [{ type: "text", name: "message" }]
     end
@@ -57,7 +59,7 @@ module ModelContextProtocol
         Tool::Response.new([{ type: "text", content: "OK" }])
       end
 
-      assert_equal tool.name, "mock_tool"
+      assert_equal tool.name_value, "mock_tool"
       assert_equal tool.description, "a mock tool for testing"
       assert_equal tool.input_schema, nil
     end

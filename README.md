@@ -46,11 +46,31 @@ module ModelContextProtocol
     def index
       server = ModelContextProtocol::Server.new(
         name: "my_server",
-        tools: [someTool, anotherTool],
-        prompts: [myPrompt],
-        context: nil,
+        tools: [SomeTool, AnotherTool],
+        prompts: [MyPrompt],
+        context: { user_id: current_user.id },
       )
-      render(json: server.handle(request.body.read).to_h)
+      render(json: server.handle_json(request.body.read).to_h)
+    end
+  end
+end
+```
+
+or, if you want/need to parse the json yourself you can do the following
+
+```ruby
+module ModelContextProtocol
+  class ApplicationController < ActionController::Base
+
+    sig { void }
+    def index
+      server = ModelContextProtocol::Server.new(
+        name: "my_server",
+        tools: [SomeTool, AnotherTool],
+        prompts: [MyPrompt],
+        context: { user_id: current_user.id },
+      )
+      render(json: server.handle(JSON.parse(request.body.read)).to_h)
     end
   end
 end
@@ -77,16 +97,19 @@ end
 ### Exception Reporting
 
 The exception reporter receives two arguments:
+
 - `exception`: The Ruby exception object that was raised
 - `context`: A hash containing contextual information about where the error occurred
 
 The context hash includes:
+
 - For tool calls: `{ tool_name: "name", arguments: { ... } }`
 - For general request handling: `{ request: { ... } }`
 
 When an exception occurs:
+
 1. The exception is reported via the configured reporter
-2. For tool calls, a generic error response is returned to the client: `{ error: "Internal error occurred", is_error: true }`
+2. For tool calls, a generic error response is returned to the client: `{ error: "Internal error occurred", isError: true }`
 3. For other requests, the exception is re-raised after reporting
 
 If no exception reporter is configured, a default no-op reporter is used that silently ignores exceptions.
@@ -104,12 +127,12 @@ class MyTool < ModelContextProtocol::Tool
   description "This tool performs specific functionality..."
   input_schema [{ type: "text", name: "message" }]
 
-  def call(message, context:)
+  def self.call(message, context:)
     Tool::Response.new([{ type: "text", content: "OK" }])
   end
 end
 
-tool = MyTool.new
+tool = MyTool
 ```
 
 2. By using the `ModelContextProtocol::Tool.define` method with a block:
@@ -143,22 +166,26 @@ class MyPrompt < ModelContextProtocol::Prompt
     )
   ]
 
-  def template(args)
-    Prompt::Result.new(
-      description: "Response description",
-      messages: [
-        Prompt::Message.new(
-          role: "user",
-          content: Content::Text.new("User message")
-        ),
-        Prompt::Message.new(
-          role: "assistant",
-          content: Content::Text.new(args["message"])
-        )
-      ]
-    )
+  class << self
+    def template(args, context:)
+      Prompt::Result.new(
+        description: "Response description",
+        messages: [
+          Prompt::Message.new(
+            role: "user",
+            content: Content::Text.new("User message")
+          ),
+          Prompt::Message.new(
+            role: "assistant",
+            content: Content::Text.new(args["message"])
+          )
+        ]
+      )
+    end
   end
 end
+
+prompt = MyPrompt
 ```
 
 2. Using the `ModelContextProtocol::Prompt.define` method:
@@ -174,7 +201,7 @@ prompt = ModelContextProtocol::Prompt.define(
       required: true
     )
   ]
-) do |args|
+) do |args, context:|
   Prompt::Result.new(
     description: "Response description",
     messages: [
@@ -191,6 +218,9 @@ prompt = ModelContextProtocol::Prompt.define(
 end
 ```
 
+The context parameter is the context passed into the server and can be used to pass per request information,
+e.g. around authentication state or user preferences.
+
 ### Key Components
 
 - `Prompt::Argument` - Defines input parameters for the prompt template
@@ -205,8 +235,8 @@ Register prompts with the MCP server:
 ```ruby
 server = ModelContextProtocol::Server.new(
   name: "my_server",
-  prompts: [MyPrompt.new],
-  context: nil,
+  prompts: [MyPrompt],
+  context: { user_id: current_user.id },
 )
 ```
 

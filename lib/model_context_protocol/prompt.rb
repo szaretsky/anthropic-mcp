@@ -45,8 +45,18 @@ module ModelContextProtocol
     end
 
     class << self
+      NOT_SET = Object.new
+
       attr_reader :description_value
       attr_reader :arguments_value
+
+      def template(args, context:)
+        raise NotImplementedError, "Subclasses must implement template"
+      end
+
+      def to_h
+        { name: name_value, description: description_value, arguments: arguments_value.map(&:to_h) }.compact
+      end
 
       def inherited(subclass)
         super
@@ -55,58 +65,57 @@ module ModelContextProtocol
         subclass.instance_variable_set(:@arguments_value, nil)
       end
 
-      def prompt_name(value)
-        @name_value = value
+      def prompt_name(value = NOT_SET)
+        if value == NOT_SET
+          @name_value
+        else
+          @name_value = value
+        end
       end
 
       def name_value
         @name_value || StringUtils.handle_from_class_name(name)
       end
 
-      def description(value)
-        @description_value = value
+      def description(value = NOT_SET)
+        if value == NOT_SET
+          @description_value
+        else
+          @description_value = value
+        end
       end
 
-      def arguments(value)
-        @arguments_value = value
+      def arguments(value = NOT_SET)
+        if value == NOT_SET
+          @arguments_value
+        else
+          @arguments_value = value
+        end
       end
 
       def define(name: nil, description: nil, arguments: [], &block)
-        new(name:, description:, arguments:).tap do |prompt|
-          prompt.define_singleton_method(:template) do |args|
-            instance_exec(args, &block)
+        Class.new(self) do
+          prompt_name name
+          description description
+          arguments arguments
+          define_singleton_method(:template) do |args, context:|
+            instance_exec(args, context:, &block)
           end
         end
       end
-    end
 
-    attr_reader :name, :description, :arguments
+      def validate_arguments!(args)
+        missing = required_args - args.keys
+        return if missing.empty?
 
-    def initialize(name: nil, description: nil, arguments: nil)
-      @name = name || self.class.name_value
-      @description = description || self.class.description_value
-      @arguments = arguments || self.class.arguments_value
-    end
+        raise ArgumentError, "Missing required arguments: #{missing.join(", ")}"
+      end
 
-    def template(args)
-      raise NotImplementedError, "Prompt subclasses must implement template"
-    end
+      private
 
-    def validate_arguments!(args)
-      missing = required_args - args.keys
-      return if missing.empty?
-
-      raise ArgumentError, "Missing required arguments: #{missing.join(", ")}"
-    end
-
-    def to_h
-      { name:, description:, arguments: arguments.map(&:to_h) }.compact
-    end
-
-    private
-
-    def required_args
-      arguments.filter_map { |arg| arg.name if arg.required }
+      def required_args
+        arguments_value.filter_map { |arg| arg.name if arg.required }
+      end
     end
   end
 end

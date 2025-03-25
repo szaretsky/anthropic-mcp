@@ -11,19 +11,21 @@ module ModelContextProtocol
         Prompt::Argument.new(name: "test_argument", description: "Test argument", required: true),
       ]
 
-      def template(args)
-        Prompt::Result.new(
-          description: "Hello, world!",
-          messages: [
-            Prompt::Message.new(role: "user", content: Content::Text.new("Hello, world!")),
-            Prompt::Message.new(role: "assistant", content: Content::Text.new("Hello, friend!")),
-          ],
-        )
+      class << self
+        def template(args, context:)
+          Prompt::Result.new(
+            description: "Hello, world!",
+            messages: [
+              Prompt::Message.new(role: "user", content: Content::Text.new("Hello, world!")),
+              Prompt::Message.new(role: "assistant", content: Content::Text.new("Hello, friend!")),
+            ],
+          )
+        end
       end
     end
 
     test "#template returns a Result with description and messages" do
-      prompt = TestPrompt.new
+      prompt = TestPrompt
 
       expected_template_result = {
         description: "Hello, world!",
@@ -33,7 +35,7 @@ module ModelContextProtocol
         ],
       }
 
-      result = prompt.template({ "test_argument" => "Hello, friend!" })
+      result = prompt.template({ "test_argument" => "Hello, friend!" }, context: { user_id: 123 })
 
       assert_equal expected_template_result, result.to_h
     end
@@ -46,20 +48,22 @@ module ModelContextProtocol
           Prompt::Argument.new(name: "test_argument", description: "Test argument", required: true),
         ]
 
-        def template(args)
-          Prompt::Result.new(
-            description: "Hello, world!",
-            messages: [
-              Prompt::Message.new(role: "user", content: Content::Text.new("Hello, world!")),
-              Prompt::Message.new(role: "assistant", content: Content::Text.new(args["test_argument"])),
-            ],
-          )
+        class << self
+          def template(args, context:)
+            Prompt::Result.new(
+              description: "Hello, world!",
+              messages: [
+                Prompt::Message.new(role: "user", content: Content::Text.new("Hello, world!")),
+                Prompt::Message.new(role: "assistant", content: Content::Text.new(args["test_argument"])),
+              ],
+            )
+          end
         end
       end
 
-      prompt = MockPrompt.new
+      prompt = MockPrompt
 
-      assert_equal "my_mock_prompt", prompt.name
+      assert_equal "my_mock_prompt", prompt.name_value
       assert_equal "a mock prompt for testing", prompt.description
       assert_equal "test_argument", prompt.arguments.first.name
       assert_equal "Test argument", prompt.arguments.first.description
@@ -73,7 +77,7 @@ module ModelContextProtocol
         ],
       }
 
-      result = prompt.template({ "test_argument" => "Hello, friend!" })
+      result = prompt.template({ "test_argument" => "Hello, friend!" }, context: { user_id: 123 })
       assert_equal expected_template_result, result.to_h
     end
 
@@ -84,20 +88,22 @@ module ModelContextProtocol
           Prompt::Argument.new(name: "test_argument", description: "Test argument", required: true),
         ]
 
-        def template(args)
-          Prompt::Result.new(
-            description: "Hello, world!",
-            messages: [
-              Prompt::Message.new(role: "user", content: Content::Text.new("Hello, world!")),
-              Prompt::Message.new(role: "assistant", content: Content::Text.new(args["test_argument"])),
-            ],
-          )
+        class << self
+          def template(args, context:)
+            Prompt::Result.new(
+              description: "Hello, world!",
+              messages: [
+                Prompt::Message.new(role: "user", content: Content::Text.new("Hello, world!")),
+                Prompt::Message.new(role: "assistant", content: Content::Text.new(args["test_argument"])),
+              ],
+            )
+          end
         end
       end
 
-      prompt = DefaultNamePrompt.new
+      prompt = DefaultNamePrompt
 
-      assert_equal "default_name_prompt", prompt.name
+      assert_equal "default_name_prompt", prompt.name_value
       assert_equal "a mock prompt for testing", prompt.description
       assert_equal "test_argument", prompt.arguments.first.name
     end
@@ -109,17 +115,19 @@ module ModelContextProtocol
         arguments: [
           Prompt::Argument.new(name: "test_argument", description: "Test argument", required: true),
         ],
-      ) do |args|
+      ) do |args, context:|
+        content = Content::Text.new(args["test_argument"] + " user: #{context[:user_id]}")
+
         Prompt::Result.new(
           description: "Hello, world!",
           messages: [
             Prompt::Message.new(role: "user", content: Content::Text.new("Hello, world!")),
-            Prompt::Message.new(role: "assistant", content: Content::Text.new(args["test_argument"])),
+            Prompt::Message.new(role: "assistant", content:),
           ],
         )
       end
 
-      assert_equal "mock_prompt", prompt.name
+      assert_equal "mock_prompt", prompt.name_value
       assert_equal "a mock prompt for testing", prompt.description
       assert_equal "test_argument", prompt.arguments.first.name
 
@@ -127,11 +135,11 @@ module ModelContextProtocol
         description: "Hello, world!",
         messages: [
           { role: "user", content: { text: "Hello, world!" } },
-          { role: "assistant", content: { text: "Hello, friend!" } },
+          { role: "assistant", content: { text: "Hello, friend! user: 123" } },
         ],
       }
 
-      result = prompt.template({ "test_argument" => "Hello, friend!" })
+      result = prompt.template({ "test_argument" => "Hello, friend!" }, context: { user_id: 123 })
       assert_equal expected, result.to_h
     end
   end

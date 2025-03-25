@@ -1,12 +1,13 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "json"
 
 module ModelContextProtocol
   class ServerTest < ActiveSupport::TestCase
     include InstrumentationTestHelper
     setup do
-      @tool = Tool.new(name: "test_tool", description: "Test tool", input_schema: {})
+      @tool = Tool.define(name: "test_tool", description: "Test tool", input_schema: {})
 
       @prompt = Prompt.define(
         name: "test_prompt",
@@ -53,6 +54,25 @@ module ModelContextProtocol
       }
 
       response = @server.handle(request)
+      assert_equal(
+        {
+          "jsonrpc": "2.0",
+          "id": "123",
+          "result": {},
+        },
+        response,
+      )
+      assert_instrumentation_data({ method: "ping" })
+    end
+
+    test "#handle_json ping request returns empty response" do
+      request = JSON.generate({
+        jsonrpc: "2.0",
+        method: "ping",
+        id: "123",
+      })
+
+      response = JSON.parse(@server.handle_json(request), symbolize_names: true)
       assert_equal(
         {
           "jsonrpc": "2.0",
@@ -121,6 +141,20 @@ module ModelContextProtocol
       assert_instrumentation_data({ method: "tools/list" })
     end
 
+    test "#handle_json tools/list returns available tools" do
+      request = JSON.generate({
+        jsonrpc: "2.0",
+        method: "tools/list",
+        id: 1,
+      })
+
+      response = JSON.parse(@server.handle_json(request), symbolize_names: true)
+      result = response[:result]
+      assert_kind_of Array, result[:tools]
+      assert_equal "test_tool", result[:tools][0][:name]
+      assert_equal "Test tool", result[:tools][0][:description]
+    end
+
     test "#tools_list_handler sets the tools/list handler" do
       @server.tools_list_handler do
         [{ name: "hammer", description: "Hammer time!" }]
@@ -160,6 +194,25 @@ module ModelContextProtocol
       assert_instrumentation_data({ method: "tools/call", tool_name: })
     end
 
+    test "#handle_json tools/call executes tool and returns result" do
+      tool_name = "test_tool"
+      tool_args = { arg: "value" }
+      tool_response = Tool::Response.new([{ result: "success" }])
+
+      @tool.expects(:call).with(**tool_args, context: @server.context).returns(tool_response)
+
+      request = JSON.generate({
+        jsonrpc: "2.0",
+        method: "tools/call",
+        params: { name: tool_name, arguments: tool_args },
+        id: 1,
+      })
+
+      response = JSON.parse(@server.handle_json(request), symbolize_names: true)
+      assert_equal tool_response.to_h, response[:result]
+      assert_instrumentation_data({ method: "tools/call", tool_name: })
+    end
+
     test "#handle tools/call returns internal error and reports exception if the tool raises an error" do
       exception = StandardError.new("Tool error")
       @tool.expects(:call).raises(exception)
@@ -189,6 +242,26 @@ module ModelContextProtocol
       assert_instrumentation_data({ method: "tools/call", tool_name: "test_tool", error: :internal_error })
     end
 
+    test "#handle_json returns internal error and reports exception if the tool raises an error" do
+      exception = StandardError.new("Tool error")
+      @tool.expects(:call).raises(exception)
+
+      request = JSON.generate({
+        jsonrpc: "2.0",
+        method: "tools/call",
+        params: {
+          name: "test_tool",
+          arguments: {},
+        },
+        id: 1,
+      })
+
+      response = JSON.parse(@server.handle_json(request), symbolize_names: true)
+      assert_equal "Internal error", response[:error][:message]
+      assert_equal "Internal error calling tool test_tool", response[:error][:data]
+      assert_instrumentation_data({ method: "tools/call", tool_name: "test_tool", error: :internal_error })
+    end
+
     test "#handle tools/call returns error for unknown tool" do
       request = {
         jsonrpc: "2.0",
@@ -206,6 +279,21 @@ module ModelContextProtocol
       assert_instrumentation_data({ method: "tools/call", error: :tool_not_found })
     end
 
+    test "#handle_json returns error for unknown tool" do
+      request = JSON.generate({
+        jsonrpc: "2.0",
+        method: "tools/call",
+        params: {
+          name: "unknown_tool",
+          arguments: {},
+        },
+        id: 1,
+      })
+
+      response = JSON.parse(@server.handle_json(request), symbolize_names: true)
+      assert_equal "Internal error", response[:error][:message]
+    end
+
     test "#tools_call_handler sets the tools/call handler" do
       @server.tools_call_handler do |request|
         tool_name = request[:name]
@@ -220,7 +308,7 @@ module ModelContextProtocol
       }
 
       response = @server.handle(request)
-      assert_equal({ content: "my_tool called successfully", is_error: false }, response[:result])
+      assert_equal({ content: "my_tool called successfully", isError: false }, response[:result])
       assert_instrumentation_data({ method: "tools/call", tool_name: "my_tool" })
     end
 
