@@ -12,7 +12,7 @@ module ModelContextProtocol
       end_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       add_instrumentation_data(duration: end_time - start_time)
 
-      ModelContextProtocol.configuration.instrumentation_callback.call(@instrumentation_data)
+      configuration.instrumentation_callback.call(@instrumentation_data)
 
       result
     end

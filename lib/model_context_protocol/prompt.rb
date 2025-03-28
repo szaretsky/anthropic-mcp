@@ -114,7 +114,7 @@ module ModelContextProtocol
       private
 
       def required_args
-        arguments_value.filter_map { |arg| arg.name if arg.required }
+        arguments_value.filter_map { |arg| arg.name.to_sym if arg.required }
       end
     end
   end

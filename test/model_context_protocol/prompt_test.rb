@@ -30,8 +30,8 @@ module ModelContextProtocol
       expected_template_result = {
         description: "Hello, world!",
         messages: [
-          { role: "user", content: { text: "Hello, world!" } },
-          { role: "assistant", content: { text: "Hello, friend!" } },
+          { role: "user", content: { text: "Hello, world!", type: "text" } },
+          { role: "assistant", content: { text: "Hello, friend!", type: "text" } },
         ],
       }
 
@@ -72,8 +72,8 @@ module ModelContextProtocol
       expected_template_result = {
         description: "Hello, world!",
         messages: [
-          { role: "user", content: { text: "Hello, world!" } },
-          { role: "assistant", content: { text: "Hello, friend!" } },
+          { role: "user", content: { text: "Hello, world!", type: "text" } },
+          { role: "assistant", content: { text: "Hello, friend!", type: "text" } },
         ],
       }
 
@@ -134,8 +134,8 @@ module ModelContextProtocol
       expected = {
         description: "Hello, world!",
         messages: [
-          { role: "user", content: { text: "Hello, world!" } },
-          { role: "assistant", content: { text: "Hello, friend! user: 123" } },
+          { role: "user", content: { text: "Hello, world!", type: "text" } },
+          { role: "assistant", content: { text: "Hello, friend! user: 123", type: "text" } },
         ],
       }
 

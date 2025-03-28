@@ -12,19 +12,21 @@ module ModelContextProtocol
       end
     end
 
-    PROTOCOL_VERSION = "2024-11-05"
+    PROTOCOL_VERSION = "2025-03-26"
 
     include Instrumentation
 
-    attr_accessor :name, :tools, :prompts, :resources, :context
+    attr_accessor :name, :tools, :prompts, :resources, :context, :configuration
 
-    def initialize(name: "model_context_protocol", tools: [], prompts: [], resources: [], context: nil)
+    def initialize(name: "model_context_protocol", tools: [], prompts: [], resources: [], context: nil,
+      configuration: nil)
       @name = name
       @tools = tools.to_h { |t| [t.name_value, t] }
       @prompts = prompts.to_h { |p| [p.name_value, p] }
       @resources = resources
       @resource_index = resources.index_by(&:uri)
       @context = context
+      @configuration = ModelContextProtocol.configuration.merge(configuration)
       @handlers = {
         "resources/list" => method(:list_resources),
         "resources/read" => method(:read_resource),
@@ -186,7 +188,7 @@ module ModelContextProtocol
     end
 
     def report_exception(exception, context = {})
-      ModelContextProtocol.configuration.exception_reporter.call(exception, context)
+      configuration.exception_reporter.call(exception, context)
     end
   end
 end

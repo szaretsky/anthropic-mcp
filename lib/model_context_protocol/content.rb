@@ -12,7 +12,7 @@ module ModelContextProtocol
       end
 
       def to_h
-        { text:, annotations: }.compact
+        { text:, annotations:, type: "text" }.compact
       end
     end
 
@@ -26,7 +26,7 @@ module ModelContextProtocol
       end
 
       def to_h
-        { data:, mime_type:, annotations: }.compact
+        { data:, mime_type:, annotations:, type: "image" }.compact
       end
     end
   end

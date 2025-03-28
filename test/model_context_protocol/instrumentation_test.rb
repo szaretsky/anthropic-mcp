@@ -6,12 +6,11 @@ module ModelContextProtocol
   class InstrumentationTest < ActiveSupport::TestCase
     class Subject
       include Instrumentation
-      attr_reader :instrumentation_data_received
+      attr_reader :instrumentation_data_received, :configuration
 
       def initialize
-        ModelContextProtocol.configure do |config|
-          config.instrumentation_callback = ->(data) { @instrumentation_data_received = data }
-        end
+        @configuration = ModelContextProtocol::Configuration.new
+        @configuration.instrumentation_callback = ->(data) { @instrumentation_data_received = data }
       end
 
       def instrumented_method

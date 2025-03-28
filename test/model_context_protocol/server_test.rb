@@ -33,19 +33,19 @@ module ModelContextProtocol
       )
 
       @server_name = "test_server"
-      ModelContextProtocol.configure do |config|
-        config.instrumentation_callback = instrumentation_helper.callback
-      end
+      configuration = ModelContextProtocol::Configuration.new
+      configuration.instrumentation_callback = instrumentation_helper.callback
 
       @server = Server.new(
         name: @server_name,
         tools: [@tool],
         prompts: [@prompt],
         resources: [@resource],
+        configuration:,
       )
     end
 
-    # https://spec.modelcontextprotocol.io/specification/2024-11-05/basic/utilities/ping/#behavior-requirements
+    # https://spec.modelcontextprotocol.io/specification/2025-03-26/basic/utilities/ping/#behavior-requirements
     test "#handle ping request returns empty response" do
       request = {
         jsonrpc: "2.0",
@@ -98,7 +98,7 @@ module ModelContextProtocol
         "jsonrpc": "2.0",
         "id": 1,
         "result": {
-          "protocolVersion": "2024-11-05",
+          "protocolVersion": "2025-03-26",
           "capabilities": {
             "prompts": {},
             "resources": {},
@@ -217,7 +217,7 @@ module ModelContextProtocol
       exception = StandardError.new("Tool error")
       @tool.expects(:call).raises(exception)
 
-      ModelContextProtocol.configuration.exception_reporter.expects(:call).with(
+      @server.configuration.exception_reporter.expects(:call).with(
         exception,
         {
           tool_name: "test_tool",
@@ -347,14 +347,14 @@ module ModelContextProtocol
         id: 1,
         params: {
           name: "test_prompt",
-          arguments: { "test_argument" => "Hello, friend!" },
+          arguments: { test_argument: "Hello, friend!" },
         },
       }
 
       expected_result = {
         description: "Hello, world!",
         messages: [
-          { role: "user", content: { text: "Hello, world!" } },
+          { role: "user", content: { text: "Hello, world!", type: "text" } },
         ],
       }
 
@@ -511,7 +511,7 @@ module ModelContextProtocol
           name: "Test resource",
           description: "Test resource",
           mimeType: "text/plain",
-          contents: [{ text: "Lorem ipsum dolor sit amet" }],
+          contents: [{ text: "Lorem ipsum dolor sit amet", type: "text" }],
         },
         response[:result],
       )
@@ -530,6 +530,29 @@ module ModelContextProtocol
       assert_equal "Method not found", response[:error][:message]
       assert_equal "unknown_method", response[:error][:data]
       assert_instrumentation_data({ method: "unknown_method" })
+    end
+
+    test "the global configuration is used if no configuration is passed to the server" do
+      server = Server.new(name: "test_server")
+      assert_equal ModelContextProtocol.configuration.instrumentation_callback,
+        server.configuration.instrumentation_callback
+      assert_equal ModelContextProtocol.configuration.exception_reporter,
+        server.configuration.exception_reporter
+    end
+
+    test "the server configuration takes precedence over the global configuration" do
+      configuration = ModelContextProtocol::Configuration.new
+      local_callback = ->(data) { puts "Local callback #{data.inspect}" }
+      local_exception_reporter = ->(exception, context) {
+        puts "Local exception reporter #{exception.inspect} #{context.inspect}"
+      }
+      configuration.instrumentation_callback = local_callback
+      configuration.exception_reporter = local_exception_reporter
+
+      server = Server.new(name: "test_server", configuration:)
+
+      assert_equal local_callback, server.configuration.instrumentation_callback
+      assert_equal local_exception_reporter, server.configuration.exception_reporter
     end
   end
 end

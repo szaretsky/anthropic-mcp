@@ -76,6 +76,24 @@ module ModelContextProtocol
 end
 ```
 
+To see sample responses without setting up a client to hit the server, you can simply run
+
+```ruby
+server = ModelContextProtocol::Server.new(
+  name: "my_server",
+  tools: [SomeTool, AnotherTool],
+  prompts: [MyPrompt],
+  context: { user_id: current_user.id },
+)
+request = {
+  jsonrpc: "2.0",
+  method: "tools/list",
+  params: {},
+  id: "1"
+}
+server.handle(request)
+```
+
 ## Configuration
 
 The gem can be configured using the `ModelContextProtocol.configure` block:
@@ -92,6 +110,26 @@ ModelContextProtocol.configure do |config|
 
   config.instrumentation_callback = -> (data) { puts "Got instrumentation data #{data.inspect}" }
 end
+
+or by creating an explicit configuration and passing it into the server.
+This is useful for systems where an application hosts more than one MCP server but
+they might require different instrumentation callbacks.
+
+configuration = ModelContextProtocol::Configuration.new
+configuration.exception_reporter = ->(exception, context) do
+  # Your exception reporting logic here
+  # For example with Bugsnag:
+  Bugsnag.notify(exception) do |report|
+    report.add_metadata(:model_context_protocol, context)
+  end
+end
+
+configuration.instrumentation_callback = -> (data) { puts "Got instrumentation data #{data.inspect}" }
+
+server = ModelContextProtocol::Server.new(
+  # ... all other options
+  configuration:,
+)
 ```
 
 ### Exception Reporting
@@ -125,10 +163,23 @@ This gem provides a `ModelContextProtocol::Tool` class that can be used to creat
 ```ruby
 class MyTool < ModelContextProtocol::Tool
   description "This tool performs specific functionality..."
-  input_schema [{ type: "text", name: "message" }]
+  input_schema [{ type: "text", text: "message" }]
+  annotations(
+    title: "My Tool",
+    read_only_hint: true,
+    destructive_hint: false,
+    idempotent_hint: true,
+    open_world_hint: false
+  )
 
-  def self.call(message, context:)
-    Tool::Response.new([{ type: "text", content: "OK" }])
+  input_schema type: 'object',
+    properties: {
+      message: { type: 'string' },
+    },
+    required: ['message']
+
+  def self.call(message:, context:)
+    Tool::Response.new([{ type: "text", text: "OK" }])
   end
 end
 
@@ -138,13 +189,32 @@ tool = MyTool
 2. By using the `ModelContextProtocol::Tool.define` method with a block:
 
 ```ruby
-tool = ModelContextProtocol::Tool.define(name: "my_tool", description: "This tool performs specific functionality...") do |args, context|
-  Tool::Response.new([{ type: "text", content: "OK" }])
+tool = ModelContextProtocol::Tool.define(
+  name: "my_tool",
+  description: "This tool performs specific functionality...",
+  annotations: {
+    title: "My Tool",
+    read_only_hint: true
+  }
+) do |args, context|
+  Tool::Response.new([{ type: "text", text: "OK" }])
 end
 ```
 
 The context parameter is the context passed into the server and can be used to pass per request information,
 e.g. around authentication state.
+
+### Tool Annotations
+
+Tools can include annotations that provide additional metadata about their behavior. The following annotations are supported:
+
+- `title`: A human-readable title for the tool
+- `read_only_hint`: Indicates if the tool only reads data (doesn't modify state)
+- `destructive_hint`: Indicates if the tool performs destructive operations
+- `idempotent_hint`: Indicates if the tool's operations are idempotent
+- `open_world_hint`: Indicates if the tool operates in an open world context
+
+Annotations can be set either through the class definition using the `annotations` class method or when defining a tool using the `define` method.
 
 ## Prompts
 

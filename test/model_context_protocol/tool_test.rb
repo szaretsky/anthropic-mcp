@@ -8,6 +8,13 @@ module ModelContextProtocol
       tool_name "test_tool"
       description "a test tool for testing"
       input_schema [{ type: "text", name: "message" }]
+      annotations(
+        title: "Test Tool",
+        read_only_hint: true,
+        destructive_hint: false,
+        idempotent_hint: true,
+        open_world_hint: false,
+      )
 
       class << self
         def call(message)
@@ -19,6 +26,18 @@ module ModelContextProtocol
     test "#to_h returns a hash with name, description, and inputSchema" do
       tool = Tool.define(name: "mock_tool", description: "a mock tool for testing")
       assert_equal tool.to_h, { name: "mock_tool", description: "a mock tool for testing", inputSchema: nil }
+    end
+
+    test "#to_h includes annotations when present" do
+      tool = TestTool
+      expected_annotations = {
+        title: "Test Tool",
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      }
+      assert_equal tool.to_h[:annotations], expected_annotations
     end
 
     test "#call invokes the tool block and returns the response" do
@@ -49,6 +68,7 @@ module ModelContextProtocol
 
       tool = DefaultNameTool
 
+      assert_equal tool.tool_name, "default_name_tool"
       assert_equal tool.name_value, "default_name_tool"
       assert_equal tool.description, "a mock tool for testing"
       assert_equal tool.input_schema, [{ type: "text", name: "message" }]
@@ -62,6 +82,119 @@ module ModelContextProtocol
       assert_equal tool.name_value, "mock_tool"
       assert_equal tool.description, "a mock tool for testing"
       assert_equal tool.input_schema, nil
+    end
+
+    test ".define allows definition of tools with annotations" do
+      tool = Tool.define(
+        name: "mock_tool",
+        description: "a mock tool for testing",
+        annotations: {
+          title: "Mock Tool",
+          read_only_hint: true,
+        },
+      ) do |_|
+        Tool::Response.new([{ type: "text", content: "OK" }])
+      end
+
+      assert_equal tool.name_value, "mock_tool"
+      assert_equal tool.description, "a mock tool for testing"
+      assert_equal tool.input_schema, nil
+      assert_equal tool.annotations_value.to_h, { title: "Mock Tool", readOnlyHint: true }
+    end
+
+    # Tests for Tool::Annotations class
+    test "Tool::Annotations initializes with all properties" do
+      annotations = Tool::Annotations.new(
+        title: "Test Tool",
+        read_only_hint: true,
+        destructive_hint: false,
+        idempotent_hint: true,
+        open_world_hint: false,
+      )
+
+      assert_equal annotations.title, "Test Tool"
+      assert_equal annotations.read_only_hint, true
+      assert_equal annotations.destructive_hint, false
+      assert_equal annotations.idempotent_hint, true
+      assert_equal annotations.open_world_hint, false
+    end
+
+    test "Tool::Annotations initializes with partial properties" do
+      annotations = Tool::Annotations.new(
+        title: "Test Tool",
+        read_only_hint: true,
+      )
+
+      assert_equal annotations.title, "Test Tool"
+      assert_equal annotations.read_only_hint, true
+      assert_nil annotations.destructive_hint
+      assert_nil annotations.idempotent_hint
+      assert_nil annotations.open_world_hint
+    end
+
+    test "Tool::Annotations#to_h omits nil values" do
+      annotations = Tool::Annotations.new(
+        title: "Test Tool",
+        read_only_hint: true,
+      )
+
+      expected = {
+        title: "Test Tool",
+        readOnlyHint: true,
+      }
+      assert_equal annotations.to_h, expected
+    end
+
+    test "Tool::Annotations#to_h handles all properties" do
+      annotations = Tool::Annotations.new(
+        title: "Test Tool",
+        read_only_hint: true,
+        destructive_hint: false,
+        idempotent_hint: true,
+        open_world_hint: false,
+      )
+
+      expected = {
+        title: "Test Tool",
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      }
+      assert_equal annotations.to_h, expected
+    end
+
+    test "Tool::Annotations#to_h returns empty hash when all values are nil" do
+      annotations = Tool::Annotations.new
+      assert_empty annotations.to_h
+    end
+
+    test "Tool class method annotations can be set and retrieved" do
+      class AnnotationsTestTool < Tool
+        tool_name "annotations_test"
+        annotations(
+          title: "Annotations Test",
+          read_only_hint: true,
+        )
+      end
+
+      tool = AnnotationsTestTool
+      assert_instance_of Tool::Annotations, tool.annotations_value
+      assert_equal tool.annotations_value.title, "Annotations Test"
+      assert_equal tool.annotations_value.read_only_hint, true
+    end
+
+    test "Tool class method annotations can be updated" do
+      class UpdatableAnnotationsTool < Tool
+        tool_name "updatable_annotations"
+      end
+
+      tool = UpdatableAnnotationsTool
+      tool.annotations(title: "Initial")
+      assert_equal tool.annotations_value.title, "Initial"
+
+      tool.annotations(title: "Updated")
+      assert_equal tool.annotations_value.title, "Updated"
     end
   end
 end
