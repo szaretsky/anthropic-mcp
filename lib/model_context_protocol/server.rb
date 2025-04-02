@@ -2,17 +2,21 @@
 
 require "json_rpc_handler"
 require_relative "instrumentation"
+require_relative "methods"
 
 module ModelContextProtocol
   class Server
     class RequestHandlerError < StandardError
-      def initialize(message, request)
+      attr_reader :error_type
+      attr_reader :original_error
+
+      def initialize(message, request, error_type: :internal_error, original_error: nil)
         super(message)
         @request = request
+        @error_type = error_type
+        @original_error = original_error
       end
     end
-
-    PROTOCOL_VERSION = "2025-03-26"
 
     include Instrumentation
 
@@ -28,14 +32,14 @@ module ModelContextProtocol
       @context = context
       @configuration = ModelContextProtocol.configuration.merge(configuration)
       @handlers = {
-        "resources/list" => method(:list_resources),
-        "resources/read" => method(:read_resource),
-        "tools/list" => method(:list_tools),
-        "tools/call" => method(:call_tool),
-        "prompts/list" => method(:list_prompts),
-        "prompts/get" => method(:get_prompt),
-        "initialize" => method(:init),
-        "ping" => ->(_) { {} },
+        Methods::RESOURCES_LIST => method(:list_resources),
+        Methods::RESOURCES_READ => method(:read_resource),
+        Methods::TOOLS_LIST => method(:list_tools),
+        Methods::TOOLS_CALL => method(:call_tool),
+        Methods::PROMPTS_LIST => method(:list_prompts),
+        Methods::PROMPTS_GET => method(:get_prompt),
+        Methods::INITIALIZE => method(:init),
+        Methods::PING => ->(_) { {} },
       }
     end
 
@@ -52,47 +56,61 @@ module ModelContextProtocol
     end
 
     def resources_list_handler(&block)
-      @handlers["resources/list"] = block
+      @handlers[Methods::RESOURCES_LIST] = block
     end
 
     def resources_read_handler(&block)
-      @handlers["resources/read"] = block
+      @handlers[Methods::RESOURCES_READ] = block
     end
 
     def tools_list_handler(&block)
-      @handlers["tools/list"] = block
+      @handlers[Methods::TOOLS_LIST] = block
     end
 
     def tools_call_handler(&block)
-      @handlers["tools/call"] = block
+      @handlers[Methods::TOOLS_CALL] = block
     end
 
     def prompts_list_handler(&block)
-      @handlers["prompts/list"] = block
+      @handlers[Methods::PROMPTS_LIST] = block
     end
 
     def prompts_get_handler(&block)
-      @handlers["prompts/get"] = block
+      @handlers[Methods::PROMPTS_GET] = block
     end
 
     private
 
     def handle_request(request, method)
-      instrument_call(method) do
-        case method
-        when "tools/list"
-          ->(params) { { tools: @handlers["tools/list"].call(params) } }
-        when "prompts/list"
-          ->(params) { { prompts: @handlers["prompts/list"].call(params) } }
-        when "resources/list"
-          ->(params) { { resources: @handlers["resources/list"].call(params) } }
-        else
-          @handlers[method]
-        end
-      rescue => e
-        report_exception(e, { request: request })
-        raise RequestHandlerError.new("Internal error handling #{request[:method]} request", request)
+      handler = @handlers[method]
+      unless handler
+        instrument_call("unsupported_method") {}
+        return
       end
+
+      ->(params) {
+        instrument_call(method) do
+          case method
+          when Methods::TOOLS_LIST
+            { tools: @handlers[Methods::TOOLS_LIST].call(params) }
+          when Methods::PROMPTS_LIST
+            { prompts: @handlers[Methods::PROMPTS_LIST].call(params) }
+          when Methods::RESOURCES_LIST
+            { resources: @handlers[Methods::RESOURCES_LIST].call(params) }
+          else
+            @handlers[method].call(params)
+          end
+        rescue => e
+          report_exception(e, { request: request })
+          if e.is_a?(RequestHandlerError)
+            add_instrumentation_data(error: e.error_type)
+            raise e
+          end
+
+          add_instrumentation_data(error: :internal_error)
+          raise RequestHandlerError.new("Internal error handling #{method} request", request, original_error: e)
+        end
+      }
     end
 
     def capabilities
@@ -111,52 +129,49 @@ module ModelContextProtocol
     end
 
     def init(request)
-      add_instrumentation_data(method: "initialize")
+      add_instrumentation_data(method: Methods::INITIALIZE)
       {
-        protocolVersion: PROTOCOL_VERSION,
+        protocolVersion: configuration.protocol_version,
         capabilities: capabilities,
         serverInfo: server_info,
       }
     end
 
     def list_tools(request)
-      add_instrumentation_data(method: "tools/list")
+      add_instrumentation_data(method: Methods::TOOLS_LIST)
       @tools.map { |_, tool| tool.to_h }
     end
 
     def call_tool(request)
-      add_instrumentation_data(method: "tools/call")
+      add_instrumentation_data(method: Methods::TOOLS_CALL)
       tool_name = request[:name]
       tool = tools[tool_name]
       unless tool
         add_instrumentation_data(error: :tool_not_found)
-        raise "Tool not found #{tool_name}"
+        raise RequestHandlerError.new("Tool not found #{tool_name}", request, error_type: :tool_not_found)
       end
 
       add_instrumentation_data(tool_name:)
 
       begin
-        result = tool.call(**request[:arguments], context:)
-        result.to_h
+        tool.call(**request[:arguments], context:).to_h
       rescue => e
-        report_exception(e, { tool_name: tool_name, arguments: request[:arguments] })
-        add_instrumentation_data(error: :internal_error)
-        raise RequestHandlerError.new("Internal error calling tool #{tool_name}", request)
+        raise RequestHandlerError.new("Internal error calling tool #{tool_name}", request, original_error: e)
       end
     end
 
     def list_prompts(request)
-      add_instrumentation_data(method: "prompts/list")
+      add_instrumentation_data(method: Methods::PROMPTS_LIST)
       @prompts.map { |_, prompt| prompt.to_h }
     end
 
     def get_prompt(request)
-      add_instrumentation_data(method: "prompts/get")
+      add_instrumentation_data(method: Methods::PROMPTS_GET)
       prompt_name = request[:name]
       prompt = @prompts[prompt_name]
       unless prompt
         add_instrumentation_data(error: :prompt_not_found)
-        raise "Prompt not found #{prompt_name}"
+        raise RequestHandlerError.new("Prompt not found #{prompt_name}", request, error_type: :prompt_not_found)
       end
 
       add_instrumentation_data(prompt_name:)
@@ -168,19 +183,19 @@ module ModelContextProtocol
     end
 
     def list_resources(request)
-      add_instrumentation_data(method: "resources/list")
+      add_instrumentation_data(method: Methods::RESOURCES_LIST)
 
       @resources.map(&:to_h)
     end
 
     def read_resource(request)
-      add_instrumentation_data(method: "resources/read")
+      add_instrumentation_data(method: Methods::RESOURCES_READ)
       resource_uri = request[:uri]
 
       resource = @resource_index[resource_uri]
       unless resource
         add_instrumentation_data(error: :resource_not_found)
-        raise "Resource not found #{resource_uri}"
+        raise RequestHandlerError.new("Resource not found #{resource_uri}", request, error_type: :resource_not_found)
       end
 
       add_instrumentation_data(resource_uri:)

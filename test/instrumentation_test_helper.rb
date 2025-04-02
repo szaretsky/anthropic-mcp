@@ -15,10 +15,10 @@ module InstrumentationTestHelper
   end
 
   def assert_instrumentation_data(expected_data)
-    data = instrumentation_helper.data.dup
+    data = instrumentation_helper.data.dup || {}
     duration = data.delete(:duration)
-    assert_not_nil(duration, "Duration is not set")
-    assert_operator(duration, :>=, 0, "Duration is not positive or zero")
+    assert_not_nil(duration, "Duration should always be set")
+    assert_operator(duration, :>=, 0, "Duration should be positive or zero")
     assert_equal(expected_data, data, "Instrumentation data does not match expected data")
   end
 end

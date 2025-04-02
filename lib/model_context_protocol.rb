@@ -9,6 +9,7 @@ require "model_context_protocol/resource"
 require "model_context_protocol/prompt"
 require "model_context_protocol/version"
 require "model_context_protocol/configuration"
+require "model_context_protocol/methods"
 
 module ModelContextProtocol
   class << self

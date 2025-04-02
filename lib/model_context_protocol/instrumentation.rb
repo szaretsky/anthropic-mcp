@@ -4,17 +4,19 @@ module ModelContextProtocol
   module Instrumentation
     def instrument_call(method, &block)
       start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      @instrumentation_data = {}
-      add_instrumentation_data(method:)
+      begin
+        @instrumentation_data = {}
+        add_instrumentation_data(method:)
 
-      result = yield block
+        result = yield block
 
-      end_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      add_instrumentation_data(duration: end_time - start_time)
+        result
+      ensure
+        end_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        add_instrumentation_data(duration: end_time - start_time)
 
-      configuration.instrumentation_callback.call(@instrumentation_data)
-
-      result
+        configuration.instrumentation_callback.call(@instrumentation_data)
+      end
     end
 
     def add_instrumentation_data(**kwargs)

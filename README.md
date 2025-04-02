@@ -132,6 +132,22 @@ server = ModelContextProtocol::Server.new(
 )
 ```
 
+### Server Protocol Version
+
+The server's protocol version can be overridden using the `protocol_version` class method:
+
+```ruby
+ModelContextProtocol::Server.protocol_version = "2024-11-05"
+```
+
+This will make all new server instances use the specified protocol version instead of the default version. The protocol version can be reset to the default by setting it to `nil`:
+
+```ruby
+ModelContextProtocol::Server.protocol_version = nil
+```
+
+Be sure to check the [MCP spec](https://spec.modelcontextprotocol.io/specification/2024-11-05/) for the protocol version to understand the supported features for the version being set.
+
 ### Exception Reporting
 
 The exception reporter receives two arguments:

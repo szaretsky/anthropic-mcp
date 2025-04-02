@@ -2,11 +2,22 @@
 
 module ModelContextProtocol
   class Configuration
-    attr_writer :exception_reporter, :instrumentation_callback
+    DEFAULT_PROTOCOL_VERSION = "2025-03-26"
 
-    def initialize(exception_reporter: nil, instrumentation_callback: nil)
+    attr_writer :exception_reporter, :instrumentation_callback, :protocol_version
+
+    def initialize(exception_reporter: nil, instrumentation_callback: nil, protocol_version: nil)
       @exception_reporter = exception_reporter
       @instrumentation_callback = instrumentation_callback
+      @protocol_version = protocol_version
+    end
+
+    def protocol_version
+      @protocol_version || DEFAULT_PROTOCOL_VERSION
+    end
+
+    def protocol_version?
+      !@protocol_version.nil?
     end
 
     def exception_reporter
@@ -38,10 +49,16 @@ module ModelContextProtocol
       else
         @instrumentation_callback
       end
+      protocol_version = if other.protocol_version?
+        other.protocol_version
+      else
+        @protocol_version
+      end
 
       Configuration.new(
         exception_reporter:,
         instrumentation_callback:,
+        protocol_version:,
       )
     end
 

@@ -108,7 +108,9 @@ module ModelContextProtocol
         missing = required_args - args.keys
         return if missing.empty?
 
-        raise ArgumentError, "Missing required arguments: #{missing.join(", ")}"
+        raise ModelContextProtocol::Server::RequestHandlerError.new(
+          "Missing required arguments: #{missing.join(", ")}", nil, error_type: :missing_required_arguments
+        )
       end
 
       private

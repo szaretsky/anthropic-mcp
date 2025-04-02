@@ -34,5 +34,32 @@ module ModelContextProtocol
       assert_equal test_exception, reported_exception
       assert_equal test_context, reported_context
     end
+
+    test "initializes with default protocol version" do
+      config = Configuration.new
+      assert_equal Configuration::DEFAULT_PROTOCOL_VERSION, config.protocol_version
+    end
+
+    test "allows setting a custom protocol version" do
+      config = Configuration.new
+      custom_version = "2025-03-27"
+      config.protocol_version = custom_version
+      assert_equal custom_version, config.protocol_version
+    end
+
+    test "merges protocol version from other configuration" do
+      config1 = Configuration.new(protocol_version: "2025-03-27")
+      config2 = Configuration.new(protocol_version: "2025-03-28")
+      config3 = Configuration.new
+
+      merged = config1.merge(config2)
+      assert_equal "2025-03-28", merged.protocol_version
+
+      merged = config1.merge(config3)
+      assert_equal "2025-03-27", merged.protocol_version
+
+      merged = config3.merge(config1)
+      assert_equal "2025-03-27", merged.protocol_version
+    end
   end
 end

@@ -8,6 +8,11 @@ module ModelContextProtocol
     include InstrumentationTestHelper
     setup do
       @tool = Tool.define(name: "test_tool", description: "Test tool", input_schema: {})
+      @tool_that_raises = Tool.define(
+        name: "tool_that_raises",
+        description: "Tool that raises",
+        input_schema: {},
+      ) { raise StandardError, "Tool error" }
 
       @prompt = Prompt.define(
         name: "test_prompt",
@@ -38,7 +43,7 @@ module ModelContextProtocol
 
       @server = Server.new(
         name: @server_name,
-        tools: [@tool],
+        tools: [@tool, @tool_that_raises],
         prompts: [@prompt],
         resources: [@resource],
         configuration:,
@@ -122,7 +127,7 @@ module ModelContextProtocol
       }
 
       assert_nil @server.handle(request)
-      assert_instrumentation_data({ method: "some_notification" })
+      assert_instrumentation_data({ method: "unsupported_method" })
     end
 
     test "#handle tools/list returns available tools" do
@@ -214,22 +219,26 @@ module ModelContextProtocol
     end
 
     test "#handle tools/call returns internal error and reports exception if the tool raises an error" do
-      exception = StandardError.new("Tool error")
-      @tool.expects(:call).raises(exception)
-
-      @server.configuration.exception_reporter.expects(:call).with(
-        exception,
-        {
-          tool_name: "test_tool",
-          arguments: {},
-        },
-      )
+      @server.configuration.exception_reporter.expects(:call).with do |exception, context|
+        assert_not_nil exception
+        assert_equal(
+          {
+            request: {
+              jsonrpc: "2.0",
+              method: "tools/call",
+              params: { name: "tool_that_raises", arguments: {} },
+              id: 1,
+            },
+          },
+          context,
+        )
+      end
 
       request = {
         jsonrpc: "2.0",
         method: "tools/call",
         params: {
-          name: "test_tool",
+          name: "tool_that_raises",
           arguments: {},
         },
         id: 1,
@@ -238,19 +247,16 @@ module ModelContextProtocol
       response = @server.handle(request)
 
       assert_equal "Internal error", response[:error][:message]
-      assert_equal "Internal error calling tool test_tool", response[:error][:data]
-      assert_instrumentation_data({ method: "tools/call", tool_name: "test_tool", error: :internal_error })
+      assert_equal "Internal error calling tool tool_that_raises", response[:error][:data]
+      assert_instrumentation_data({ method: "tools/call", tool_name: "tool_that_raises", error: :internal_error })
     end
 
     test "#handle_json returns internal error and reports exception if the tool raises an error" do
-      exception = StandardError.new("Tool error")
-      @tool.expects(:call).raises(exception)
-
       request = JSON.generate({
         jsonrpc: "2.0",
         method: "tools/call",
         params: {
-          name: "test_tool",
+          name: "tool_that_raises",
           arguments: {},
         },
         id: 1,
@@ -258,8 +264,8 @@ module ModelContextProtocol
 
       response = JSON.parse(@server.handle_json(request), symbolize_names: true)
       assert_equal "Internal error", response[:error][:message]
-      assert_equal "Internal error calling tool test_tool", response[:error][:data]
-      assert_instrumentation_data({ method: "tools/call", tool_name: "test_tool", error: :internal_error })
+      assert_equal "Internal error calling tool tool_that_raises", response[:error][:data]
+      assert_instrumentation_data({ method: "tools/call", tool_name: "tool_that_raises", error: :internal_error })
     end
 
     test "#handle tools/call returns error for unknown tool" do
@@ -392,7 +398,11 @@ module ModelContextProtocol
 
       response = @server.handle(request)
       assert_equal "Missing required arguments: test_argument", response[:error][:data]
-      assert_instrumentation_data({ method: "prompts/get", prompt_name: "test_prompt" })
+      assert_instrumentation_data({
+        method: "prompts/get",
+        prompt_name: "test_prompt",
+        error: :missing_required_arguments,
+      })
     end
 
     test "#prompts_get_handler sets the prompts/get handler" do
@@ -529,7 +539,7 @@ module ModelContextProtocol
 
       assert_equal "Method not found", response[:error][:message]
       assert_equal "unknown_method", response[:error][:data]
-      assert_instrumentation_data({ method: "unknown_method" })
+      assert_instrumentation_data({ method: "unsupported_method" })
     end
 
     test "the global configuration is used if no configuration is passed to the server" do
@@ -553,6 +563,32 @@ module ModelContextProtocol
 
       assert_equal local_callback, server.configuration.instrumentation_callback
       assert_equal local_exception_reporter, server.configuration.exception_reporter
+    end
+
+    test "server uses default protocol version when not configured" do
+      request = {
+        jsonrpc: "2.0",
+        method: "initialize",
+        id: 1,
+      }
+
+      response = @server.handle(request)
+      assert_equal Configuration::DEFAULT_PROTOCOL_VERSION, response[:result][:protocolVersion]
+    end
+
+    test "server protocol version can be overridden via configuration" do
+      custom_version = "2025-03-27"
+      configuration = Configuration.new(protocol_version: custom_version)
+      server = Server.new(name: "test_server", configuration: configuration)
+
+      request = {
+        jsonrpc: "2.0",
+        method: "initialize",
+        id: 1,
+      }
+
+      response = server.handle(request)
+      assert_equal custom_version, response[:result][:protocolVersion]
     end
   end
 end
