@@ -36,6 +36,7 @@ It implements the Model Context Protocol specification, handling model context r
 
 ### Usage
 
+#### Rails Controller
 Implement an `ApplicationController` which calls the `Server#handle` method, eg
 
 ```ruby
@@ -75,6 +76,59 @@ module ModelContextProtocol
   end
 end
 ```
+
+#### Stdio Transport
+
+If you want to build a simple command-line application, you can use the stdio transport:
+
+```ruby
+#!/usr/bin/env ruby
+require "model_context_protocol"
+require "model_context_protocol/transports/stdio"
+
+# Create a simple tool
+class ExampleTool < ModelContextProtocol::Tool
+  description "A simple example tool that echoes back its arguments"
+  input_schema type: "object",
+    properties: {
+      message: { type: "string" },
+    },
+    required: ["message"]
+
+  class << self
+    def call(message:, context:)
+      ModelContextProtocol::Tool::Response.new([{
+        type: "text",
+        text: "Hello from example tool! Message: #{message}",
+      }])
+    end
+  end
+end
+
+# Set up the server
+server = ModelContextProtocol::Server.new(
+  name: "example_server",
+  tools: [ExampleTool],
+)
+
+# Create and start the transport
+transport = ModelContextProtocol::Transports::StdioTransport.new(server)
+transport.open
+```
+
+You can run this script and then type in requests to the server at the command line.
+
+```
+$ ./stdio_server.rb
+{"jsonrpc":"2.0","id":"1","result":"pong"}
+{"jsonrpc":"2.0","id":"2","result":["ExampleTool"]}
+{"jsonrpc":"2.0","id":"3","result":["ExampleTool"]}
+```
+
+
+
+
+#### Testing without a transport
 
 To see sample responses without setting up a client to hit the server, you can simply run
 

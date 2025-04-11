@@ -28,7 +28,7 @@ module ModelContextProtocol
       @tools = tools.to_h { |t| [t.name_value, t] }
       @prompts = prompts.to_h { |p| [p.name_value, p] }
       @resources = resources
-      @resource_index = resources.index_by(&:uri)
+      @resource_index = index_resources_by_uri(resources)
       @context = context
       @configuration = ModelContextProtocol.configuration.merge(configuration)
       @handlers = {
@@ -204,6 +204,12 @@ module ModelContextProtocol
 
     def report_exception(exception, context = {})
       configuration.exception_reporter.call(exception, context)
+    end
+
+    def index_resources_by_uri(resources)
+      resources.each_with_object({}) do |resource, hash|
+        hash[resource.uri] = resource
+      end
     end
   end
 end
