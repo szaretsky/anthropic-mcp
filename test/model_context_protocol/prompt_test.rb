@@ -12,7 +12,7 @@ module ModelContextProtocol
       ]
 
       class << self
-        def template(args, context:)
+        def template(args, server_context:)
           Prompt::Result.new(
             description: "Hello, world!",
             messages: [
@@ -35,7 +35,7 @@ module ModelContextProtocol
         ],
       }
 
-      result = prompt.template({ "test_argument" => "Hello, friend!" }, context: { user_id: 123 })
+      result = prompt.template({ "test_argument" => "Hello, friend!" }, server_context: { user_id: 123 })
 
       assert_equal expected_template_result, result.to_h
     end
@@ -49,7 +49,7 @@ module ModelContextProtocol
         ]
 
         class << self
-          def template(args, context:)
+          def template(args, server_context:)
             Prompt::Result.new(
               description: "Hello, world!",
               messages: [
@@ -77,7 +77,7 @@ module ModelContextProtocol
         ],
       }
 
-      result = prompt.template({ "test_argument" => "Hello, friend!" }, context: { user_id: 123 })
+      result = prompt.template({ "test_argument" => "Hello, friend!" }, server_context: { user_id: 123 })
       assert_equal expected_template_result, result.to_h
     end
 
@@ -89,7 +89,7 @@ module ModelContextProtocol
         ]
 
         class << self
-          def template(args, context:)
+          def template(args, server_context:)
             Prompt::Result.new(
               description: "Hello, world!",
               messages: [
@@ -115,8 +115,8 @@ module ModelContextProtocol
         arguments: [
           Prompt::Argument.new(name: "test_argument", description: "Test argument", required: true),
         ],
-      ) do |args, context:|
-        content = Content::Text.new(args["test_argument"] + " user: #{context[:user_id]}")
+      ) do |args, server_context:|
+        content = Content::Text.new(args["test_argument"] + " user: #{server_context[:user_id]}")
 
         Prompt::Result.new(
           description: "Hello, world!",
@@ -139,7 +139,7 @@ module ModelContextProtocol
         ],
       }
 
-      result = prompt.template({ "test_argument" => "Hello, friend!" }, context: { user_id: 123 })
+      result = prompt.template({ "test_argument" => "Hello, friend!" }, server_context: { user_id: 123 })
       assert_equal expected, result.to_h
     end
   end

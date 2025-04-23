@@ -44,7 +44,7 @@ module ModelContextProtocol
       attr_reader :input_schema_value
       attr_reader :annotations_value
 
-      def call(*args, context:)
+      def call(*args, server_context:)
         raise NotImplementedError, "Subclasses must implement call"
       end
 
@@ -108,8 +108,8 @@ module ModelContextProtocol
           description description
           input_schema input_schema
           self.annotations(annotations) if annotations
-          define_singleton_method(:call) do |*args, context:|
-            instance_exec(*args, context:, &block)
+          define_singleton_method(:call) do |*args, server_context:|
+            instance_exec(*args, server_context:, &block)
           end
         end
       end

@@ -182,7 +182,7 @@ module ModelContextProtocol
       tool_args = { "arg" => "value" }
       tool_response = Tool::Response.new([{ "result" => "success" }])
 
-      @tool.expects(:call).with(**tool_args, context: @server.context).returns(tool_response)
+      @tool.expects(:call).with(**tool_args, server_context: @server.server_context).returns(tool_response)
 
       request = {
         jsonrpc: "2.0",
@@ -204,7 +204,7 @@ module ModelContextProtocol
       tool_args = { arg: "value" }
       tool_response = Tool::Response.new([{ result: "success" }])
 
-      @tool.expects(:call).with(**tool_args, context: @server.context).returns(tool_response)
+      @tool.expects(:call).with(**tool_args, server_context: @server.server_context).returns(tool_response)
 
       request = JSON.generate({
         jsonrpc: "2.0",
@@ -219,7 +219,7 @@ module ModelContextProtocol
     end
 
     test "#handle tools/call returns internal error and reports exception if the tool raises an error" do
-      @server.configuration.exception_reporter.expects(:call).with do |exception, context|
+      @server.configuration.exception_reporter.expects(:call).with do |exception, server_context|
         assert_not_nil exception
         assert_equal(
           {
@@ -230,7 +230,7 @@ module ModelContextProtocol
               id: 1,
             },
           },
-          context,
+          server_context,
         )
       end
 
@@ -553,8 +553,8 @@ module ModelContextProtocol
     test "the server configuration takes precedence over the global configuration" do
       configuration = ModelContextProtocol::Configuration.new
       local_callback = ->(data) { puts "Local callback #{data.inspect}" }
-      local_exception_reporter = ->(exception, context) {
-        puts "Local exception reporter #{exception.inspect} #{context.inspect}"
+      local_exception_reporter = ->(exception, server_context) {
+        puts "Local exception reporter #{exception.inspect} #{server_context.inspect}"
       }
       configuration.instrumentation_callback = local_callback
       configuration.exception_reporter = local_exception_reporter

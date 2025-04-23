@@ -15,7 +15,7 @@ class ExampleTool < ModelContextProtocol::Tool
     required: ["message"]
 
   class << self
-    def call(message:, context:)
+    def call(message:, server_context:)
       ModelContextProtocol::Tool::Response.new([{
         type: "text",
         text: "Hello from example tool! Message: #{message}",

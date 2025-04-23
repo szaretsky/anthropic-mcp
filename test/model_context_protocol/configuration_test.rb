@@ -10,10 +10,10 @@ module ModelContextProtocol
 
       # The default reporter should be callable but do nothing
       exception = StandardError.new("test error")
-      context = { test: "context" }
+      server_context = { test: "context" }
 
       # Should not raise any errors
-      config.exception_reporter.call(exception, context)
+      config.exception_reporter.call(exception, server_context)
     end
 
     test "allows setting a custom exception reporter" do
@@ -21,9 +21,9 @@ module ModelContextProtocol
       reported_exception = nil
       reported_context = nil
 
-      config.exception_reporter = ->(exception, context) do
+      config.exception_reporter = ->(exception, server_context) do
         reported_exception = exception
-        reported_context = context
+        reported_context = server_context
       end
 
       test_exception = StandardError.new("test error")

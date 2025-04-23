@@ -50,7 +50,7 @@ module ModelContextProtocol
       attr_reader :description_value
       attr_reader :arguments_value
 
-      def template(args, context:)
+      def template(args, server_context:)
         raise NotImplementedError, "Subclasses must implement template"
       end
 
@@ -98,8 +98,8 @@ module ModelContextProtocol
           prompt_name name
           description description
           arguments arguments
-          define_singleton_method(:template) do |args, context:|
-            instance_exec(args, context:, &block)
+          define_singleton_method(:template) do |args, server_context:|
+            instance_exec(args, server_context:, &block)
           end
         end
       end

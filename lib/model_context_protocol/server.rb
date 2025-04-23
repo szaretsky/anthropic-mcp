@@ -20,16 +20,16 @@ module ModelContextProtocol
 
     include Instrumentation
 
-    attr_accessor :name, :tools, :prompts, :resources, :context, :configuration
+    attr_accessor :name, :tools, :prompts, :resources, :server_context, :configuration
 
-    def initialize(name: "model_context_protocol", tools: [], prompts: [], resources: [], context: nil,
+    def initialize(name: "model_context_protocol", tools: [], prompts: [], resources: [], server_context: nil,
       configuration: nil)
       @name = name
       @tools = tools.to_h { |t| [t.name_value, t] }
       @prompts = prompts.to_h { |p| [p.name_value, p] }
       @resources = resources
       @resource_index = index_resources_by_uri(resources)
-      @context = context
+      @server_context = server_context
       @configuration = ModelContextProtocol.configuration.merge(configuration)
       @handlers = {
         Methods::RESOURCES_LIST => method(:list_resources),
@@ -154,7 +154,7 @@ module ModelContextProtocol
       add_instrumentation_data(tool_name:)
 
       begin
-        tool.call(**request[:arguments], context:).to_h
+        tool.call(**request[:arguments], server_context:).to_h
       rescue => e
         raise RequestHandlerError.new("Internal error calling tool #{tool_name}", request, original_error: e)
       end
@@ -179,7 +179,7 @@ module ModelContextProtocol
       prompt_args = request[:arguments]
       prompt.validate_arguments!(prompt_args)
 
-      prompt.template(prompt_args, context:).to_h
+      prompt.template(prompt_args, server_context:).to_h
     end
 
     def list_resources(request)
@@ -202,8 +202,8 @@ module ModelContextProtocol
       resource.to_h
     end
 
-    def report_exception(exception, context = {})
-      configuration.exception_reporter.call(exception, context)
+    def report_exception(exception, server_context = {})
+      configuration.exception_reporter.call(exception, server_context)
     end
 
     def index_resources_by_uri(resources)

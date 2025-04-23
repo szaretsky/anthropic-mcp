@@ -49,7 +49,7 @@ module ModelContextProtocol
         name: "my_server",
         tools: [SomeTool, AnotherTool],
         prompts: [MyPrompt],
-        context: { user_id: current_user.id },
+        server_context: { user_id: current_user.id },
       )
       render(json: server.handle_json(request.body.read).to_h)
     end
@@ -69,7 +69,7 @@ module ModelContextProtocol
         name: "my_server",
         tools: [SomeTool, AnotherTool],
         prompts: [MyPrompt],
-        context: { user_id: current_user.id },
+        server_context: { user_id: current_user.id },
       )
       render(json: server.handle(JSON.parse(request.body.read)).to_h)
     end
@@ -96,7 +96,7 @@ class ExampleTool < ModelContextProtocol::Tool
     required: ["message"]
 
   class << self
-    def call(message:, context:)
+    def call(message:, server_context:)
       ModelContextProtocol::Tool::Response.new([{
         type: "text",
         text: "Hello from example tool! Message: #{message}",
@@ -137,7 +137,7 @@ server = ModelContextProtocol::Server.new(
   name: "my_server",
   tools: [SomeTool, AnotherTool],
   prompts: [MyPrompt],
-  context: { user_id: current_user.id },
+  server_context: { user_id: current_user.id },
 )
 request = {
   jsonrpc: "2.0",
@@ -154,11 +154,11 @@ The gem can be configured using the `ModelContextProtocol.configure` block:
 
 ```ruby
 ModelContextProtocol.configure do |config|
-  config.exception_reporter = ->(exception, context) do
+  config.exception_reporter = ->(exception, server_context) do
     # Your exception reporting logic here
     # For example with Bugsnag:
     Bugsnag.notify(exception) do |report|
-      report.add_metadata(:model_context_protocol, context)
+      report.add_metadata(:model_context_protocol, server_context)
     end
   end
 
@@ -170,11 +170,11 @@ This is useful for systems where an application hosts more than one MCP server b
 they might require different instrumentation callbacks.
 
 configuration = ModelContextProtocol::Configuration.new
-configuration.exception_reporter = ->(exception, context) do
+configuration.exception_reporter = ->(exception, server_context) do
   # Your exception reporting logic here
   # For example with Bugsnag:
   Bugsnag.notify(exception) do |report|
-    report.add_metadata(:model_context_protocol, context)
+    report.add_metadata(:model_context_protocol, server_context)
   end
 end
 
@@ -207,9 +207,9 @@ Be sure to check the [MCP spec](https://spec.modelcontextprotocol.io/specificati
 The exception reporter receives two arguments:
 
 - `exception`: The Ruby exception object that was raised
-- `context`: A hash containing contextual information about where the error occurred
+- `server_context`: A hash containing contextual information about where the error occurred
 
-The context hash includes:
+The server_context hash includes:
 
 - For tool calls: `{ tool_name: "name", arguments: { ... } }`
 - For general request handling: `{ request: { ... } }`
@@ -248,7 +248,7 @@ class MyTool < ModelContextProtocol::Tool
     },
     required: ['message']
 
-  def self.call(message:, context:)
+  def self.call(message:, server_context:)
     Tool::Response.new([{ type: "text", text: "OK" }])
   end
 end
@@ -266,12 +266,12 @@ tool = ModelContextProtocol::Tool.define(
     title: "My Tool",
     read_only_hint: true
   }
-) do |args, context|
+) do |args, server_context|
   Tool::Response.new([{ type: "text", text: "OK" }])
 end
 ```
 
-The context parameter is the context passed into the server and can be used to pass per request information,
+The server_context parameter is the server_context passed into the server and can be used to pass per request information,
 e.g. around authentication state.
 
 ### Tool Annotations
@@ -307,7 +307,7 @@ class MyPrompt < ModelContextProtocol::Prompt
   ]
 
   class << self
-    def template(args, context:)
+    def template(args, server_context:)
       Prompt::Result.new(
         description: "Response description",
         messages: [
@@ -341,7 +341,7 @@ prompt = ModelContextProtocol::Prompt.define(
       required: true
     )
   ]
-) do |args, context:|
+) do |args, server_context:|
   Prompt::Result.new(
     description: "Response description",
     messages: [
@@ -358,7 +358,7 @@ prompt = ModelContextProtocol::Prompt.define(
 end
 ```
 
-The context parameter is the context passed into the server and can be used to pass per request information,
+The server_context parameter is the server_context passed into the server and can be used to pass per request information,
 e.g. around authentication state or user preferences.
 
 ### Key Components
@@ -376,7 +376,7 @@ Register prompts with the MCP server:
 server = ModelContextProtocol::Server.new(
   name: "my_server",
   prompts: [MyPrompt],
-  context: { user_id: current_user.id },
+  server_context: { user_id: current_user.id },
 )
 ```
 

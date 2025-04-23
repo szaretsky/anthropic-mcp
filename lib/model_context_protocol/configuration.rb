@@ -65,7 +65,7 @@ module ModelContextProtocol
     private
 
     def default_exception_reporter
-      @default_exception_reporter ||= ->(exception, context) {}
+      @default_exception_reporter ||= ->(exception, server_context) {}
     end
 
     def default_instrumentation_callback
