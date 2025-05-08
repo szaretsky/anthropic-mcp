@@ -2,7 +2,7 @@
 
 module ModelContextProtocol
   class Configuration
-    DEFAULT_PROTOCOL_VERSION = "2025-03-26"
+    DEFAULT_PROTOCOL_VERSION = "2024-11-05"
 
     attr_writer :exception_reporter, :instrumentation_callback, :protocol_version
 

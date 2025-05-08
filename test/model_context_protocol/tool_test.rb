@@ -7,7 +7,7 @@ module ModelContextProtocol
     class TestTool < Tool
       tool_name "test_tool"
       description "a test tool for testing"
-      input_schema [{ type: "text", name: "message" }]
+      input_schema({ properties: { message: { type: "string" } }, required: ["message"] })
       annotations(
         title: "Test Tool",
         read_only_hint: true,
@@ -17,7 +17,7 @@ module ModelContextProtocol
       )
 
       class << self
-        def call(message)
+        def call(message, server_context: nil)
           Tool::Response.new([{ type: "text", content: "OK" }])
         end
       end
@@ -25,7 +25,7 @@ module ModelContextProtocol
 
     test "#to_h returns a hash with name, description, and inputSchema" do
       tool = Tool.define(name: "mock_tool", description: "a mock tool for testing")
-      assert_equal tool.to_h, { name: "mock_tool", description: "a mock tool for testing", inputSchema: nil }
+      assert_equal tool.to_h, { name: "mock_tool", description: "a mock tool for testing", inputSchema: {} }
     end
 
     test "#to_h includes annotations when present" do
@@ -51,27 +51,34 @@ module ModelContextProtocol
       class MockTool < Tool
         tool_name "my_mock_tool"
         description "a mock tool for testing"
-        input_schema [{ type: "text", name: "message" }]
+        input_schema({ properties: { message: { type: "string" } }, required: [:message] })
       end
 
       tool = MockTool
       assert_equal tool.name_value, "my_mock_tool"
       assert_equal tool.description, "a mock tool for testing"
-      assert_equal tool.input_schema, [{ type: "text", name: "message" }]
+      assert_equal tool.input_schema.to_h,
+        { type: "object", properties: { message: { type: "string" } }, required: [:message] }
     end
 
     test "defaults to class name as tool name" do
       class DefaultNameTool < Tool
-        description "a mock tool for testing"
-        input_schema [{ type: "text", name: "message" }]
       end
 
       tool = DefaultNameTool
 
       assert_equal tool.tool_name, "default_name_tool"
-      assert_equal tool.name_value, "default_name_tool"
-      assert_equal tool.description, "a mock tool for testing"
-      assert_equal tool.input_schema, [{ type: "text", name: "message" }]
+    end
+
+    test "accepts input schema as an InputSchema object" do
+      class InputSchemaTool < Tool
+        input_schema InputSchema.new(properties: { message: { type: "string" } }, required: [:message])
+      end
+
+      tool = InputSchemaTool
+
+      expected = { type: "object", properties: { message: { type: "string" } }, required: [:message] }
+      assert_equal expected, tool.input_schema.to_h
     end
 
     test ".define allows definition of simple tools with a block" do

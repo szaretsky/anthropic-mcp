@@ -2,11 +2,11 @@
 # frozen_string_literal: true
 
 module ModelContextProtocol
-  class Resource
-    attr_reader :uri, :name, :description, :mime_type
+  class ResourceTemplate
+    attr_reader :uri_template, :name, :description, :mime_type
 
-    def initialize(uri:, name:, description:, mime_type:)
-      @uri = uri
+    def initialize(uri_template:, name:, description: nil, mime_type: nil)
+      @uri_template = uri_template
       @name = name
       @description = description
       @mime_type = mime_type
@@ -14,11 +14,11 @@ module ModelContextProtocol
 
     def to_h
       {
-        uri: @uri,
+        uriTemplate: @uri_template,
         name: @name,
         description: @description,
         mimeType: @mime_type,
-      }
+      }.compact
     end
   end
 end

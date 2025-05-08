@@ -6,30 +6,89 @@ require "model_context_protocol"
 require "model_context_protocol/transports/stdio"
 
 # Create a simple tool
-class ExampleTool < ModelContextProtocol::Tool
-  description "A simple example tool that echoes back its arguments"
-  input_schema type: "object",
+class ExampleTool < MCP::Tool
+  description "A simple example tool that adds two numbers"
+  input_schema(
     properties: {
-      message: { type: "string" },
+      a: { type: "number" },
+      b: { type: "number" },
     },
-    required: ["message"]
+    required: ["a", "b"],
+  )
 
   class << self
-    def call(message:, server_context:)
-      ModelContextProtocol::Tool::Response.new([{
+    def call(a:, b:)
+      MCP::Tool::Response.new([{
         type: "text",
-        text: "Hello from example tool! Message: #{message}",
+        text: "The sum of #{a} and #{b} is #{a + b}",
       }])
     end
   end
 end
 
+# Create a simple prompt
+class ExamplePrompt < MCP::Prompt
+  description "A simple example prompt that echoes back its arguments"
+  arguments [
+    MCP::Prompt::Argument.new(
+      name: "message",
+      description: "The message to echo back",
+      required: true,
+    ),
+  ]
+
+  class << self
+    def template(args, server_context:)
+      MCP::Prompt::Result.new(
+        messages: [
+          MCP::Prompt::Message.new(
+            role: "user",
+            content: MCP::Content::Text.new(args[:message]),
+          ),
+        ],
+      )
+    end
+  end
+end
+
 # Set up the server
-server = ModelContextProtocol::Server.new(
+server = MCP::Server.new(
   name: "example_server",
   tools: [ExampleTool],
+  prompts: [ExamplePrompt],
+  resources: [
+    MCP::Resource.new(
+      uri: "test_resource",
+      name: "Test resource",
+      description: "Test resource that echoes back the uri as its content",
+      mime_type: "text/plain",
+    ),
+  ],
 )
 
+server.define_tool(
+  name: "echo",
+  description: "A simple example tool that echoes back its arguments",
+  input_schema: { properties: { message: { type: "string" } }, required: ["message"] },
+) do |message:|
+  MCP::Tool::Response.new(
+    [
+      {
+        type: "text",
+        text: "Hello from echo tool! Message: #{message}",
+      },
+    ],
+  )
+end
+
+server.resources_read_handler do |params|
+  [{
+    uri: params[:uri],
+    mimeType: "text/plain",
+    text: "Hello, world!",
+  }]
+end
+
 # Create and start the transport
-transport = ModelContextProtocol::Transports::StdioTransport.new(server)
+transport = MCP::Transports::StdioTransport.new(server)
 transport.open

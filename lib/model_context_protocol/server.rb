@@ -20,26 +20,43 @@ module ModelContextProtocol
 
     include Instrumentation
 
-    attr_accessor :name, :tools, :prompts, :resources, :server_context, :configuration
+    attr_accessor :name, :tools, :prompts, :resources, :server_context, :configuration, :capabilities
 
-    def initialize(name: "model_context_protocol", tools: [], prompts: [], resources: [], server_context: nil,
-      configuration: nil)
+    def initialize(
+      name: "model_context_protocol",
+      tools: [],
+      prompts: [],
+      resources: [],
+      resource_templates: [],
+      server_context: nil,
+      configuration: nil,
+      capabilities: { prompts: {}, resources: {}, tools: {} }
+    )
       @name = name
       @tools = tools.to_h { |t| [t.name_value, t] }
       @prompts = prompts.to_h { |p| [p.name_value, p] }
       @resources = resources
+      @resource_templates = resource_templates
       @resource_index = index_resources_by_uri(resources)
       @server_context = server_context
       @configuration = ModelContextProtocol.configuration.merge(configuration)
+      @capabilities = capabilities
+
       @handlers = {
         Methods::RESOURCES_LIST => method(:list_resources),
-        Methods::RESOURCES_READ => method(:read_resource),
+        Methods::RESOURCES_READ => method(:read_resource_no_content),
+        Methods::RESOURCES_TEMPLATES_LIST => method(:list_resource_templates),
         Methods::TOOLS_LIST => method(:list_tools),
         Methods::TOOLS_CALL => method(:call_tool),
         Methods::PROMPTS_LIST => method(:list_prompts),
         Methods::PROMPTS_GET => method(:get_prompt),
         Methods::INITIALIZE => method(:init),
         Methods::PING => ->(_) { {} },
+
+        # No op handlers for currently unsupported methods
+        Methods::RESOURCES_SUBSCRIBE => ->(_) {},
+        Methods::RESOURCES_UNSUBSCRIBE => ->(_) {},
+        Methods::LOGGING_SET_LEVEL => ->(_) {},
       }
     end
 
@@ -55,12 +72,26 @@ module ModelContextProtocol
       end
     end
 
+    def define_tool(name: nil, description: nil, input_schema: nil, annotations: nil, &block)
+      tool = Tool.define(name:, description:, input_schema:, annotations:, &block)
+      @tools[tool.name_value] = tool
+    end
+
+    def define_prompt(name: nil, description: nil, arguments: [], &block)
+      prompt = Prompt.define(name:, description:, arguments:, &block)
+      @prompts[prompt.name_value] = prompt
+    end
+
     def resources_list_handler(&block)
       @handlers[Methods::RESOURCES_LIST] = block
     end
 
     def resources_read_handler(&block)
       @handlers[Methods::RESOURCES_READ] = block
+    end
+
+    def resources_templates_list_handler(&block)
+      @handlers[Methods::RESOURCES_TEMPLATES_LIST] = block
     end
 
     def tools_list_handler(&block)
@@ -88,6 +119,8 @@ module ModelContextProtocol
         return
       end
 
+      Methods.ensure_capability!(method, capabilities)
+
       ->(params) {
         instrument_call(method) do
           case method
@@ -97,6 +130,10 @@ module ModelContextProtocol
             { prompts: @handlers[Methods::PROMPTS_LIST].call(params) }
           when Methods::RESOURCES_LIST
             { resources: @handlers[Methods::RESOURCES_LIST].call(params) }
+          when Methods::RESOURCES_READ
+            { contents: @handlers[Methods::RESOURCES_READ].call(params) }
+          when Methods::RESOURCES_TEMPLATES_LIST
+            { resourceTemplates: @handlers[Methods::RESOURCES_TEMPLATES_LIST].call(params) }
           else
             @handlers[method].call(params)
           end
@@ -110,14 +147,6 @@ module ModelContextProtocol
           add_instrumentation_data(error: :internal_error)
           raise RequestHandlerError.new("Internal error handling #{method} request", request, original_error: e)
         end
-      }
-    end
-
-    def capabilities
-      @capabilities ||= {
-        prompts: {},
-        resources: {},
-        tools: {},
       }
     end
 
@@ -151,10 +180,25 @@ module ModelContextProtocol
         raise RequestHandlerError.new("Tool not found #{tool_name}", request, error_type: :tool_not_found)
       end
 
+      arguments = request[:arguments]
       add_instrumentation_data(tool_name:)
 
+      if tool.input_schema&.missing_required_arguments?(arguments)
+        add_instrumentation_data(error: :missing_required_arguments)
+        raise RequestHandlerError.new(
+          "Missing required arguments: #{tool.input_schema.missing_required_arguments(arguments).join(", ")}",
+          request,
+          error_type: :missing_required_arguments,
+        )
+      end
+
       begin
-        tool.call(**request[:arguments], server_context:).to_h
+        call_params = tool.method(:call).parameters.flatten
+        if call_params.include?(:server_context)
+          tool.call(**arguments.transform_keys(&:to_sym), server_context:).to_h
+        else
+          tool.call(**arguments.transform_keys(&:to_sym)).to_h
+        end
       rescue => e
         raise RequestHandlerError.new("Internal error calling tool #{tool_name}", request, original_error: e)
       end
@@ -188,18 +232,17 @@ module ModelContextProtocol
       @resources.map(&:to_h)
     end
 
-    def read_resource(request)
+    # Server implementation should set read_resource_handler to override no-op default
+    def read_resource_no_content(request)
       add_instrumentation_data(method: Methods::RESOURCES_READ)
-      resource_uri = request[:uri]
+      add_instrumentation_data(resource_uri: request[:uri])
+      []
+    end
 
-      resource = @resource_index[resource_uri]
-      unless resource
-        add_instrumentation_data(error: :resource_not_found)
-        raise RequestHandlerError.new("Resource not found #{resource_uri}", request, error_type: :resource_not_found)
-      end
+    def list_resource_templates(request)
+      add_instrumentation_data(method: Methods::RESOURCES_TEMPLATES_LIST)
 
-      add_instrumentation_data(resource_uri:)
-      resource.to_h
+      @resource_templates.map(&:to_h)
     end
 
     def report_exception(exception, server_context = {})

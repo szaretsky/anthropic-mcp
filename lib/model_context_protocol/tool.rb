@@ -2,41 +2,6 @@
 
 module ModelContextProtocol
   class Tool
-    class Response
-      attr_reader :content, :is_error
-
-      def initialize(content, is_error = false)
-        @content = content
-        @is_error = is_error
-      end
-
-      def to_h
-        { content:, isError: is_error }.compact
-      end
-    end
-
-    class Annotations
-      attr_reader :title, :read_only_hint, :destructive_hint, :idempotent_hint, :open_world_hint
-
-      def initialize(title: nil, read_only_hint: nil, destructive_hint: nil, idempotent_hint: nil, open_world_hint: nil)
-        @title = title
-        @read_only_hint = read_only_hint
-        @destructive_hint = destructive_hint
-        @idempotent_hint = idempotent_hint
-        @open_world_hint = open_world_hint
-      end
-
-      def to_h
-        {
-          title:,
-          readOnlyHint: read_only_hint,
-          destructiveHint: destructive_hint,
-          idempotentHint: idempotent_hint,
-          openWorldHint: open_world_hint,
-        }.compact
-      end
-    end
-
     class << self
       NOT_SET = Object.new
 
@@ -52,7 +17,7 @@ module ModelContextProtocol
         result = {
           name: name_value,
           description: description_value,
-          inputSchema: input_schema_value,
+          inputSchema: input_schema_value.to_h,
         }
         result[:annotations] = annotations_value.to_h if annotations_value
         result
@@ -88,8 +53,12 @@ module ModelContextProtocol
 
       def input_schema(value = NOT_SET)
         if value == NOT_SET
-          @input_schema_value
-        else
+          input_schema_value
+        elsif value.is_a?(Hash)
+          properties = value[:properties] || value["properties"] || {}
+          required = value[:required] || value["required"] || []
+          @input_schema_value = InputSchema.new(properties:, required:)
+        elsif value.is_a?(InputSchema)
           @input_schema_value = value
         end
       end
@@ -108,9 +77,7 @@ module ModelContextProtocol
           description description
           input_schema input_schema
           self.annotations(annotations) if annotations
-          define_singleton_method(:call) do |*args, server_context:|
-            instance_exec(*args, server_context:, &block)
-          end
+          define_singleton_method(:call, &block) if block
         end
       end
     end

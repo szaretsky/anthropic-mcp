@@ -3,47 +3,6 @@
 
 module ModelContextProtocol
   class Prompt
-    class Argument
-      attr_reader :name, :description, :required, :arguments
-
-      def initialize(name:, description: nil, required: false)
-        @name = name
-        @description = description
-        @required = required
-        @arguments = arguments
-      end
-
-      def to_h
-        { name:, description:, required: }.compact
-      end
-    end
-
-    class Message
-      attr_reader :role, :content
-
-      def initialize(role:, content:)
-        @role = role
-        @content = content
-      end
-
-      def to_h
-        { role:, content: content.to_h }.compact
-      end
-    end
-
-    class Result
-      attr_reader :description, :messages
-
-      def initialize(description: nil, messages: [])
-        @description = description
-        @messages = messages
-      end
-
-      def to_h
-        { description:, messages: messages.map(&:to_h) }.compact
-      end
-    end
-
     class << self
       NOT_SET = Object.new
 

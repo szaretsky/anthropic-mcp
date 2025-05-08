@@ -2,16 +2,18 @@
 
 require "test_helper"
 require "json"
+require "debug"
 
 module ModelContextProtocol
   class ServerTest < ActiveSupport::TestCase
     include InstrumentationTestHelper
     setup do
-      @tool = Tool.define(name: "test_tool", description: "Test tool", input_schema: {})
+      @tool = Tool.define(name: "test_tool", description: "Test tool")
+
       @tool_that_raises = Tool.define(
         name: "tool_that_raises",
         description: "Tool that raises",
-        input_schema: {},
+        input_schema: { type: "object", properties: { message: { type: "string" } }, required: ["message"] },
       ) { raise StandardError, "Tool error" }
 
       @prompt = Prompt.define(
@@ -34,7 +36,13 @@ module ModelContextProtocol
         name: "Test resource",
         description: "Test resource",
         mime_type: "text/plain",
-        contents: [Content::Text.new("Hello, world!")],
+      )
+
+      @resource_template = ResourceTemplate.new(
+        uri_template: "test_resource/{id}",
+        name: "Test resource",
+        description: "Test resource",
+        mime_type: "text/plain",
       )
 
       @server_name = "test_server"
@@ -46,6 +54,7 @@ module ModelContextProtocol
         tools: [@tool, @tool_that_raises],
         prompts: [@prompt],
         resources: [@resource],
+        resource_templates: [@resource_template],
         configuration:,
       )
     end
@@ -103,7 +112,7 @@ module ModelContextProtocol
         "jsonrpc": "2.0",
         "id": 1,
         "result": {
-          "protocolVersion": "2025-03-26",
+          "protocolVersion": "2024-11-05",
           "capabilities": {
             "prompts": {},
             "resources": {},
@@ -179,10 +188,10 @@ module ModelContextProtocol
 
     test "#handle tools/call executes tool and returns result" do
       tool_name = "test_tool"
-      tool_args = { "arg" => "value" }
-      tool_response = Tool::Response.new([{ "result" => "success" }])
+      tool_args = { arg: "value" }
+      tool_response = Tool::Response.new([{ result: "success" }])
 
-      @tool.expects(:call).with(**tool_args, server_context: @server.server_context).returns(tool_response)
+      @tool.expects(:call).with(arg: "value").returns(tool_response)
 
       request = {
         jsonrpc: "2.0",
@@ -199,12 +208,39 @@ module ModelContextProtocol
       assert_instrumentation_data({ method: "tools/call", tool_name: })
     end
 
+    test "#handle tools/call returns error if required tool arguments are missing" do
+      tool_with_required_argument = Tool.define(
+        name: "test_tool",
+        description: "Test tool",
+        input_schema: { properties: { message: { type: "string" } }, required: ["message"] },
+      ) do |message: nil|
+        Tool::Response.new("success #{message}")
+      end
+
+      server = Server.new(
+        name: "test_server",
+        tools: [tool_with_required_argument],
+      )
+
+      request = {
+        jsonrpc: "2.0",
+        method: "tools/call",
+        params: { name: "test_tool", arguments: {} },
+        id: 1,
+      }
+
+      response = server.handle(request)
+
+      assert_equal "Missing required arguments: message", response[:error][:data]
+      assert_equal "Internal error", response[:error][:message]
+    end
+
     test "#handle_json tools/call executes tool and returns result" do
       tool_name = "test_tool"
       tool_args = { arg: "value" }
       tool_response = Tool::Response.new([{ result: "success" }])
 
-      @tool.expects(:call).with(**tool_args, server_context: @server.server_context).returns(tool_response)
+      @tool.expects(:call).with(arg: "value").returns(tool_response)
 
       request = JSON.generate({
         jsonrpc: "2.0",
@@ -213,8 +249,9 @@ module ModelContextProtocol
         id: 1,
       })
 
-      response = JSON.parse(@server.handle_json(request), symbolize_names: true)
-      assert_equal tool_response.to_h, response[:result]
+      raw_response = @server.handle_json(request)
+      response = JSON.parse(raw_response, symbolize_names: true) if raw_response
+      assert_equal tool_response.to_h, response[:result] if response
       assert_instrumentation_data({ method: "tools/call", tool_name: })
     end
 
@@ -226,7 +263,7 @@ module ModelContextProtocol
             request: {
               jsonrpc: "2.0",
               method: "tools/call",
-              params: { name: "tool_that_raises", arguments: {} },
+              params: { name: "tool_that_raises", arguments: { message: "test" } },
               id: 1,
             },
           },
@@ -239,7 +276,7 @@ module ModelContextProtocol
         method: "tools/call",
         params: {
           name: "tool_that_raises",
-          arguments: {},
+          arguments: { message: "test" },
         },
         id: 1,
       }
@@ -257,7 +294,7 @@ module ModelContextProtocol
         method: "tools/call",
         params: {
           name: "tool_that_raises",
-          arguments: {},
+          arguments: { message: "test" },
         },
         id: 1,
       })
@@ -274,7 +311,7 @@ module ModelContextProtocol
         method: "tools/call",
         params: {
           name: "unknown_tool",
-          arguments: {},
+          arguments: { message: "test" },
         },
         id: 1,
       }
@@ -462,47 +499,28 @@ module ModelContextProtocol
       assert_instrumentation_data({ method: "resources/list" })
     end
 
-    test "#handle resources/read returns a resource" do
+    test "#handle resources/read returns an empty array of contents by default" do
       request = {
         jsonrpc: "2.0",
         method: "resources/read",
         id: 1,
         params: {
-          uri: @resource.uri,
+          uri: "example.com",
         },
       }
 
       response = @server.handle(request)
-      assert_equal(@resource.to_h, response[:result])
-      assert_instrumentation_data({ method: "resources/read", resource_uri: @resource.uri })
-    end
-
-    test "#handle resources/read returns error if resource is not found" do
-      request = {
-        jsonrpc: "2.0",
-        method: "resources/read",
-        id: 1,
-        params: {
-          uri: "unknown_resource",
-        },
-      }
-
-      response = @server.handle(request)
-      assert_equal "Resource not found unknown_resource", response[:error][:data]
-      assert_instrumentation_data({ method: "resources/read", error: :resource_not_found })
+      assert_equal({ contents: [] }, response[:result])
+      assert_instrumentation_data({ method: "resources/read", resource_uri: "example.com" })
     end
 
     test "#resources_read_handler sets the resources/read handler" do
       @server.resources_read_handler do |request|
-        uri = request[:uri]
-
-        Resource.new(
-          uri: uri,
-          name: "Test resource",
-          description: "Test resource",
+        return {
+          uri: request[:uri],
           mime_type: "text/plain",
-          contents: [Content::Text.new("Lorem ipsum dolor sit amet")],
-        ).to_h
+          text: "Lorem ipsum dolor sit amet",
+        }
       end
 
       request = {
@@ -510,22 +528,76 @@ module ModelContextProtocol
         method: "resources/read",
         id: 1,
         params: {
-          uri: "test_resource",
+          uri: "example.com/my_resource",
         },
       }
 
       response = @server.handle(request)
       assert_equal(
+        { contents: [{ uri: "example.com/my_resource", mimeType: "text/plain", text: "Lorem ipsum dolor sit amet" }] },
+        response[:result],
+      )
+    end
+
+    test "#handle resources/templates/list returns a list of resource templates" do
+      request = {
+        jsonrpc: "2.0",
+        method: "resources/templates/list",
+        id: 1,
+      }
+
+      response = @server.handle(request)
+      assert_equal(
         {
-          uri: "test_resource",
-          name: "Test resource",
-          description: "Test resource",
-          mimeType: "text/plain",
-          contents: [{ text: "Lorem ipsum dolor sit amet", type: "text" }],
+          resourceTemplates: [@resource_template.to_h],
         },
         response[:result],
       )
-      assert_instrumentation_data({ method: "resources/read" })
+      assert_instrumentation_data({ method: "resources/templates/list" })
+    end
+
+    test "#resources_templates_list_handler sets the resources/templates/list handler" do
+      @server.resources_templates_list_handler do
+        [{ uriTemplate: "test_resource_template/{id}", name: "Test resource template", description: "a template" }]
+      end
+
+      request = {
+        jsonrpc: "2.0",
+        method: "resources/templates/list",
+        id: 1,
+      }
+
+      response = @server.handle(request)
+      assert_equal(
+        {
+          resourceTemplates: [
+            {
+              uriTemplate: "test_resource_template/{id}",
+              name: "Test resource template",
+              description: "a template",
+            },
+          ],
+        },
+        response[:result],
+      )
+      assert_instrumentation_data({ method: "resources/templates/list" })
+    end
+
+    test "#handle method with missing required top-level capability returns an error" do
+      @server.capabilities = {}
+
+      response = @server.handle({ jsonrpc: "2.0", method: "prompts/list", id: 1 })
+      assert_equal "Server does not support prompts (required for prompts/list)", response[:error][:data]
+
+      response = @server.handle({ jsonrpc: "2.0", method: "resources/list", id: 1 })
+      assert_equal "Server does not support resources (required for resources/list)", response[:error][:data]
+    end
+
+    test "#handle method with missing required nested capability returns an error" do
+      @server.capabilities = { resources: {} }
+      response = @server.handle({ jsonrpc: "2.0", method: "resources/subscribe", id: 1 })
+      assert_equal "Server does not support resources_subscribe (required for resources/subscribe)",
+        response[:error][:data]
     end
 
     test "#handle unknown method returns method not found error" do
@@ -574,6 +646,70 @@ module ModelContextProtocol
 
       response = @server.handle(request)
       assert_equal Configuration::DEFAULT_PROTOCOL_VERSION, response[:result][:protocolVersion]
+    end
+
+    test "#define_tool adds a tool to the server" do
+      @server.define_tool(
+        name: "defined_tool",
+        description: "Defined tool",
+        input_schema: { type: "object", properties: { message: { type: "string" } }, required: ["message"] },
+      ) do |message:|
+        Tool::Response.new(message)
+      end
+
+      response = @server.handle({
+        jsonrpc: "2.0",
+        method: "tools/call",
+        params: { name: "defined_tool", arguments: { message: "success" } },
+        id: 1,
+      })
+
+      assert_equal({ content: "success", isError: false }, response[:result])
+    end
+
+    test "#define_tool call definition allows tool arguments and server context" do
+      @server.server_context = { user_id: "123" }
+
+      @server.define_tool(
+        name: "defined_tool",
+        description: "Defined tool",
+        input_schema: { type: "object", properties: { message: { type: "string" } }, required: ["message"] },
+      ) do |message:, server_context:|
+        Tool::Response.new("success #{message} #{server_context[:user_id]}")
+      end
+
+      response = @server.handle({
+        jsonrpc: "2.0",
+        method: "tools/call",
+        params: { name: "defined_tool", arguments: { message: "hello" } },
+        id: 1,
+      })
+
+      assert_equal({ content: "success hello 123", isError: false }, response[:result])
+    end
+
+    test "#define_prompt adds a tool to the server" do
+      @server.define_prompt(name: "defined_prompt", description: "Defined prompt", arguments: []) do
+        Prompt::Result.new(
+          description: "a prompt description",
+          messages: [Prompt::Message.new(role: "user", content: Content::Text.new("a prompt message"))],
+        )
+      end
+
+      response = @server.handle({
+        jsonrpc: "2.0",
+        method: "prompts/get",
+        params: { name: "defined_prompt", arguments: {} },
+        id: 1,
+      })
+
+      assert_equal(
+        {
+          description: "a prompt description",
+          messages: [{ role: "user", content: { text: "a prompt message", type: "text" } }],
+        },
+        response[:result],
+      )
     end
 
     test "server protocol version can be overridden via configuration" do

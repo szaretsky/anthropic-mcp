@@ -1,17 +1,6 @@
 # Model Context Protocol
 
-A Ruby gem implementing Model Context Protocol + JSON RPC 2.0 spec
-
-## Overview
-
-Model Context Protocol provides a standardized way to interact with language models through a JSON RPC 2.0 interface.
-
-It handles request/response formatting, error handling, and tool integrations in a type-safe manner using Sorbet.
-
-See https://spec.modelcontextprotocol.io/specification/
-
-This implementation breaks from the transport examples in the spec as it implements a POST-based JSON RPC call rather
-than a stateful SSE transport.
+A Ruby gem for implementing Model Context Protocol servers
 
 ## MCP Server
 
@@ -19,31 +8,45 @@ The `ModelContextProtocol::Server` class is the core component that handles JSON
 It implements the Model Context Protocol specification, handling model context requests and responses.
 
 ### Key Features
-
 - Implements JSON-RPC 2.0 message handling
 - Supports protocol initialization and capability negotiation
 - Manages tool registration and invocation
-- Provides type-safe request/response handling using Sorbet
+- Supports prompt registration and execution
+- Supports resource registration and retrieval
 
 ### Supported Methods
-
 - `initialize` - Initializes the protocol and returns server capabilities
-- `ping` - Simple health check that returns "pong"
+- `ping` - Simple health check
 - `tools/list` - Lists all registered tools and their schemas
 - `tools/call` - Invokes a specific tool with provided arguments
 - `prompts/list` - Lists all registered prompts and their schemas
 - `prompts/get` - Retrieves a specific prompt by name
+- `resources/list` - Lists all registered resources and their schemas
+- `resources/read` - Retrieves a specific resource by name
+- `resources/templates/list` - Lists all registered resource templates and their schemas
+
+### Unsupported Features ( to be implemented in future versions )
+
+- Notifications
+- Log Level
+- Resource subscriptions
+- Completions
+- Complete StreamableHTTP implementation with streaming responses
 
 ### Usage
 
 #### Rails Controller
-Implement an `ApplicationController` which calls the `Server#handle` method, eg
+
+When added to a Rails controller on a route that handles POST requests, your server will be compliant with non-streaming
+[StreamableHTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) transport
+requests.
+
+You can use the `Server#handle_json` method to handle requests.
 
 ```ruby
 module ModelContextProtocol
   class ApplicationController < ActionController::Base
 
-    sig { void }
     def index
       server = ModelContextProtocol::Server.new(
         name: "my_server",
@@ -57,29 +60,9 @@ module ModelContextProtocol
 end
 ```
 
-or, if you want/need to parse the json yourself you can do the following
-
-```ruby
-module ModelContextProtocol
-  class ApplicationController < ActionController::Base
-
-    sig { void }
-    def index
-      server = ModelContextProtocol::Server.new(
-        name: "my_server",
-        tools: [SomeTool, AnotherTool],
-        prompts: [MyPrompt],
-        server_context: { user_id: current_user.id },
-      )
-      render(json: server.handle(JSON.parse(request.body.read)).to_h)
-    end
-  end
-end
-```
-
 #### Stdio Transport
 
-If you want to build a simple command-line application, you can use the stdio transport:
+If you want to build a local command-line application, you can use the stdio transport:
 
 ```ruby
 #!/usr/bin/env ruby
@@ -89,11 +72,12 @@ require "model_context_protocol/transports/stdio"
 # Create a simple tool
 class ExampleTool < ModelContextProtocol::Tool
   description "A simple example tool that echoes back its arguments"
-  input_schema type: "object",
+  input_schema(
     properties: {
       message: { type: "string" },
     },
     required: ["message"]
+  )
 
   class << self
     def call(message:, server_context:)
@@ -125,36 +109,13 @@ $ ./stdio_server.rb
 {"jsonrpc":"2.0","id":"3","result":["ExampleTool"]}
 ```
 
-
-
-
-#### Testing without a transport
-
-To see sample responses without setting up a client to hit the server, you can simply run
-
-```ruby
-server = ModelContextProtocol::Server.new(
-  name: "my_server",
-  tools: [SomeTool, AnotherTool],
-  prompts: [MyPrompt],
-  server_context: { user_id: current_user.id },
-)
-request = {
-  jsonrpc: "2.0",
-  method: "tools/list",
-  params: {},
-  id: "1"
-}
-server.handle(request)
-```
-
 ## Configuration
 
 The gem can be configured using the `ModelContextProtocol.configure` block:
 
 ```ruby
 ModelContextProtocol.configure do |config|
-  config.exception_reporter = ->(exception, server_context) do
+  config.exception_reporter = do |exception, server_context|
     # Your exception reporting logic here
     # For example with Bugsnag:
     Bugsnag.notify(exception) do |report|
@@ -162,15 +123,19 @@ ModelContextProtocol.configure do |config|
     end
   end
 
-  config.instrumentation_callback = -> (data) { puts "Got instrumentation data #{data.inspect}" }
+  config.instrumentation_callback = do |data|
+    puts "Got instrumentation data #{data.inspect}"
+  end
 end
+```
 
 or by creating an explicit configuration and passing it into the server.
 This is useful for systems where an application hosts more than one MCP server but
 they might require different instrumentation callbacks.
 
+```ruby
 configuration = ModelContextProtocol::Configuration.new
-configuration.exception_reporter = ->(exception, server_context) do
+configuration.exception_reporter = do |exception, server_context|
   # Your exception reporting logic here
   # For example with Bugsnag:
   Bugsnag.notify(exception) do |report|
@@ -178,12 +143,73 @@ configuration.exception_reporter = ->(exception, server_context) do
   end
 end
 
-configuration.instrumentation_callback = -> (data) { puts "Got instrumentation data #{data.inspect}" }
+configuration.instrumentation_callback = do |data|
+  puts "Got instrumentation data #{data.inspect}"
+end
 
 server = ModelContextProtocol::Server.new(
   # ... all other options
   configuration:,
 )
+```
+
+### Server Context and Configuration Block Data
+
+#### `server_context`
+
+The `server_context` is a user-defined hash that is passed into the server instance and made available to tools, prompts, and exception/instrumentation callbacks. It can be used to provide contextual information such as authentication state, user IDs, or request-specific data.
+
+**Type:**
+```ruby
+server_context: { [String, Symbol] => Any }
+```
+
+**Example:**
+```ruby
+server = ModelContextProtocol::Server.new(
+  name: "my_server",
+  server_context: { user_id: current_user.id, request_id: request.uuid }
+)
+```
+
+This hash is then passed as the `server_context` argument to tool and prompt calls, and is included in exception and instrumentation callbacks.
+
+#### Configuration Block Data
+
+##### Exception Reporter
+
+The exception reporter receives:
+
+- `exception`: The Ruby exception object that was raised
+- `server_context`: The context hash provided to the server
+
+**Signature:**
+```ruby
+exception_reporter = ->(exception, server_context) { ... }
+```
+
+##### Instrumentation Callback
+
+The instrumentation callback receives a hash with the following possible keys:
+
+- `method`: (String) The protocol method called (e.g., "ping", "tools/list")
+- `tool_name`: (String, optional) The name of the tool called
+- `prompt_name`: (String, optional) The name of the prompt called
+- `resource_uri`: (String, optional) The URI of the resource called
+- `error`: (String, optional) Error code if a lookup failed
+- `duration`: (Float) Duration of the call in seconds
+
+**Type:**
+```ruby
+instrumentation_callback = ->(data) { ... }
+# where data is a Hash with keys as described above
+```
+
+**Example:**
+```ruby
+config.instrumentation_callback = ->(data) do
+  puts "Instrumentation: #{data.inspect}"
+end
 ```
 
 ### Server Protocol Version
@@ -233,7 +259,12 @@ This gem provides a `ModelContextProtocol::Tool` class that can be used to creat
 ```ruby
 class MyTool < ModelContextProtocol::Tool
   description "This tool performs specific functionality..."
-  input_schema [{ type: "text", text: "message" }]
+  input_schema(
+    properties: {
+      message: { type: "string" },
+    },
+    required: ["message"]
+  )
   annotations(
     title: "My Tool",
     read_only_hint: true,
@@ -241,12 +272,6 @@ class MyTool < ModelContextProtocol::Tool
     idempotent_hint: true,
     open_world_hint: false
   )
-
-  input_schema type: 'object',
-    properties: {
-      message: { type: 'string' },
-    },
-    required: ['message']
 
   def self.call(message:, server_context:)
     Tool::Response.new([{ type: "text", text: "OK" }])
@@ -392,7 +417,9 @@ To register a handler pass a proc/lambda to as `instrumentation_callback` into t
 
 ```ruby
 ModelContextProtocol.configure do |config|
-  config.instrumentation_callback = -> (data) { puts "Got instrumentation data #{data.inspect}" }
+  config.instrumentation_callback = do |data|
+    puts "Got instrumentation data #{data.inspect}"
+  end
 end
 ```
 
@@ -406,6 +433,40 @@ The data contains the following keys:
 
 `tool_name`, `prompt_name` and `resource_uri` are only populated if a matching handler is registered.
 This is to avoid potential issues with metric cardinality
+
+## Resources
+
+MCP spec includes [Resources](https://modelcontextprotocol.io/docs/concepts/resources)
+
+The `ModelContextProtocol::Resource` class provides a way to register resources with the server.
+
+```ruby
+resource = ModelContextProtocol::Resource.new(
+  uri: "example.com/my_resource",
+  mime_type: "text/plain",
+  text: "Lorem ipsum dolor sit amet"
+)
+
+server = ModelContextProtocol::Server.new(
+  name: "my_server",
+  resources: [resource],
+)
+```
+
+The server must register a handler for the `resources/read` method to retrieve a resource dynamically.
+
+```ruby
+server.resources_read_handler do |params|
+  [{
+    uri: params[:uri],
+    mimeType: "text/plain",
+    text: "Hello, world!",
+  }]
+end
+
+```
+
+otherwise 'resources/read' requests will be a no-op.
 
 ## Releases
 
