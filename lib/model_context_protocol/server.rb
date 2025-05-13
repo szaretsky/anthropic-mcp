@@ -155,7 +155,15 @@ module ModelContextProtocol
     end
 
     def determine_capabilities
-      { prompts: {}, resources: {}, tools: {} }
+      defines_prompts = @prompts.any? || @handlers[Methods::PROMPTS_LIST] != method(:list_prompts)
+      defines_tools = @tools.any? || @handlers[Methods::TOOLS_LIST] != method(:list_tools)
+      defines_resources = @resources.any? || @handlers[Methods::RESOURCES_LIST] != method(:list_resources)
+      defines_resource_templates = @resource_templates.any? || @handlers[Methods::RESOURCES_TEMPLATES_LIST] != method(:list_resource_templates)
+      {
+        prompts: defines_prompts ? {} : nil,
+        resources: defines_resources || defines_resource_templates ? {} : nil,
+        tools: defines_tools ? {} : nil,
+      }.compact
     end
 
     def server_info
