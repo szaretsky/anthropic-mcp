@@ -20,7 +20,8 @@ module ModelContextProtocol
 
     include Instrumentation
 
-    attr_accessor :name, :tools, :prompts, :resources, :server_context, :configuration, :capabilities
+    attr_writer :capabilities
+    attr_accessor :name, :tools, :prompts, :resources, :server_context, :configuration
 
     def initialize(
       name: "model_context_protocol",
@@ -30,7 +31,7 @@ module ModelContextProtocol
       resource_templates: [],
       server_context: nil,
       configuration: nil,
-      capabilities: { prompts: {}, resources: {}, tools: {} }
+      capabilities: nil
     )
       @name = name
       @tools = tools.to_h { |t| [t.name_value, t] }
@@ -40,7 +41,6 @@ module ModelContextProtocol
       @resource_index = index_resources_by_uri(resources)
       @server_context = server_context
       @configuration = ModelContextProtocol.configuration.merge(configuration)
-      @capabilities = capabilities
 
       @handlers = {
         Methods::RESOURCES_LIST => method(:list_resources),
@@ -58,6 +58,10 @@ module ModelContextProtocol
         Methods::RESOURCES_UNSUBSCRIBE => ->(_) {},
         Methods::LOGGING_SET_LEVEL => ->(_) {},
       }
+    end
+
+    def capabilities
+      @capabilities ||= determine_capabilities
     end
 
     def handle(request)
@@ -148,6 +152,10 @@ module ModelContextProtocol
           raise RequestHandlerError.new("Internal error handling #{method} request", request, original_error: e)
         end
       }
+    end
+
+    def determine_capabilities
+      { prompts: {}, resources: {}, tools: {} }
     end
 
     def server_info
