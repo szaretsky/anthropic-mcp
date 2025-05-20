@@ -22,7 +22,6 @@ module ModelContextProtocol
 
     include Instrumentation
 
-
     attr_writer :capabilities
     attr_accessor :name, :version, :tools, :prompts, :resources, :server_context, :configuration
 
