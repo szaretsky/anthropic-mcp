@@ -17,6 +17,8 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.entry.ruby }}
-          bundler-cache: true
+          bundler-cache: false
+      - name: Bundle install
+        run: bundle install
       - run: bundle exec rake test
         continue-on-error: ${{ matrix.entry.allowed-failure }}
