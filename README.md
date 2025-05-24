@@ -116,17 +116,17 @@ The gem can be configured using the `ModelContextProtocol.configure` block:
 
 ```ruby
 ModelContextProtocol.configure do |config|
-  config.exception_reporter = do |exception, server_context|
+  config.exception_reporter = ->(exception, server_context) {
     # Your exception reporting logic here
     # For example with Bugsnag:
     Bugsnag.notify(exception) do |report|
       report.add_metadata(:model_context_protocol, server_context)
     end
-  end
+  }
 
-  config.instrumentation_callback = do |data|
+  config.instrumentation_callback = ->(data) {
     puts "Got instrumentation data #{data.inspect}"
-  end
+  }
 end
 ```
 
@@ -136,17 +136,17 @@ they might require different instrumentation callbacks.
 
 ```ruby
 configuration = ModelContextProtocol::Configuration.new
-configuration.exception_reporter = do |exception, server_context|
+configuration.exception_reporter = ->(exception, server_context) {
   # Your exception reporting logic here
   # For example with Bugsnag:
   Bugsnag.notify(exception) do |report|
     report.add_metadata(:model_context_protocol, server_context)
   end
-end
+}
 
-configuration.instrumentation_callback = do |data|
+configuration.instrumentation_callback = ->(data) {
   puts "Got instrumentation data #{data.inspect}"
-end
+}
 
 server = ModelContextProtocol::Server.new(
   # ... all other options
@@ -208,9 +208,9 @@ instrumentation_callback = ->(data) { ... }
 
 **Example:**
 ```ruby
-config.instrumentation_callback = ->(data) do
+config.instrumentation_callback = ->(data) {
   puts "Instrumentation: #{data.inspect}"
-end
+}
 ```
 
 ### Server Protocol Version
@@ -418,10 +418,10 @@ To register a handler pass a proc/lambda to as `instrumentation_callback` into t
 
 ```ruby
 ModelContextProtocol.configure do |config|
-  config.instrumentation_callback = do |data|
+  config.instrumentation_callback = ->(data) {
     puts "Got instrumentation data #{data.inspect}"
   end
-end
+}
 ```
 
 The data contains the following keys:
