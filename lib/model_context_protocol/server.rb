@@ -252,7 +252,7 @@ module ModelContextProtocol
       @resources.map(&:to_h)
     end
 
-    # Server implementation should set read_resource_handler to override no-op default
+    # Server implementation should set `resources_read_handler` to override no-op default
     def read_resource_no_content(request)
       add_instrumentation_data(method: Methods::RESOURCES_READ)
       add_instrumentation_data(resource_uri: request[:uri])
