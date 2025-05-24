@@ -18,7 +18,6 @@ require_relative "model_context_protocol/prompt/message"
 require_relative "model_context_protocol/prompt/result"
 require_relative "model_context_protocol/version"
 require_relative "model_context_protocol/configuration"
-require_relative "model_context_protocol/methods"
 
 module ModelContextProtocol
   class << self
