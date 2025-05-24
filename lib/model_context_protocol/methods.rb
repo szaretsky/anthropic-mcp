@@ -34,23 +34,6 @@ module ModelContextProtocol
 
     extend self
 
-    ALL_METHODS = [
-      SAMPLING_CREATE_MESSAGE,
-      INITIALIZE,
-      LOGGING_SET_LEVEL,
-      PING,
-      PROMPTS_GET,
-      PROMPTS_LIST,
-      COMPLETION_COMPLETE,
-      RESOURCES_LIST,
-      RESOURCES_READ,
-      RESOURCES_TEMPLATES_LIST,
-      RESOURCES_SUBSCRIBE,
-      RESOURCES_UNSUBSCRIBE,
-      TOOLS_CALL,
-      TOOLS_LIST,
-    ]
-
     def ensure_capability!(method, capabilities)
       case method
       when PROMPTS_GET, PROMPTS_LIST, COMPLETION_COMPLETE
