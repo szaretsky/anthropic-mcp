@@ -60,6 +60,7 @@ module ModelContextProtocol
         # No op handlers for currently unsupported methods
         Methods::RESOURCES_SUBSCRIBE => ->(_) {},
         Methods::RESOURCES_UNSUBSCRIBE => ->(_) {},
+        Methods::COMPLETION_COMPLETE => ->(_) {},
         Methods::LOGGING_SET_LEVEL => ->(_) {},
       }
     end

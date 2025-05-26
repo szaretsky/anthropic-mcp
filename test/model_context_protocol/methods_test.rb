@@ -19,6 +19,13 @@ module ModelContextProtocol
       assert_equal "Server does not support sampling (required for sampling/createMessage)", error.message
     end
 
+    test "ensure_capability! for completion/complete raises an error if completions capability is not present" do
+      error = assert_raises(Methods::MissingRequiredCapabilityError) do
+        Methods.ensure_capability!(Methods::COMPLETION_COMPLETE, {})
+      end
+      assert_equal "Server does not support completions (required for completion/complete)", error.message
+    end
+
     test "ensure_capability! for logging/setLevel raises an error if logging capability is not present" do
       error = assert_raises(Methods::MissingRequiredCapabilityError) do
         Methods.ensure_capability!(Methods::LOGGING_SET_LEVEL, {})
