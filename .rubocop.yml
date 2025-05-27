@@ -1,5 +1,10 @@
 inherit_gem:
   rubocop-shopify: rubocop.yml
+
+plugins:
+  - rubocop-minitest
+  - rubocop-rake
+
 Naming/FileName:
   Exclude:
     - 'lib/mcp-ruby.rb'
