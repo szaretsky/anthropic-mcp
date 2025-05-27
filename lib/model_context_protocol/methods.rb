@@ -36,7 +36,7 @@ module ModelContextProtocol
 
     def ensure_capability!(method, capabilities)
       case method
-      when PROMPTS_GET, PROMPTS_LIST, COMPLETION_COMPLETE
+      when PROMPTS_GET, PROMPTS_LIST
         unless capabilities[:prompts]
           raise MissingRequiredCapabilityError.new(method, :prompts)
         end
@@ -55,6 +55,10 @@ module ModelContextProtocol
       when SAMPLING_CREATE_MESSAGE
         unless capabilities[:sampling]
           raise MissingRequiredCapabilityError.new(method, :sampling)
+        end
+      when COMPLETION_COMPLETE
+        unless capabilities[:completions]
+          raise MissingRequiredCapabilityError.new(method, :completions)
         end
       when LOGGING_SET_LEVEL
         # Logging is unsupported by the Server
