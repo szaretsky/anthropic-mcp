@@ -18,7 +18,7 @@ module MCP
         name: @name,
         description: @description,
         mimeType: @mime_type,
-      }
+      }.compact
     end
   end
 end
