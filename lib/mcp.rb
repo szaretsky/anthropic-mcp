@@ -1,7 +1,6 @@
-# typed: strict
 # frozen_string_literal: true
 
-require_relative "model_context_protocol/server"
+require_relative "mcp/server"
 require_relative "model_context_protocol/string_utils"
 require_relative "model_context_protocol/tool"
 require_relative "model_context_protocol/tool/input_schema"
@@ -19,7 +18,7 @@ require_relative "model_context_protocol/prompt/result"
 require_relative "model_context_protocol/version"
 require_relative "model_context_protocol/configuration"
 
-module ModelContextProtocol
+module MCP
   class << self
     def configure
       yield(configuration)
@@ -40,4 +39,4 @@ module ModelContextProtocol
   end
 end
 
-MCP = ModelContextProtocol
+ModelContextProtocol = MCP
