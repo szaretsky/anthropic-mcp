@@ -2,8 +2,8 @@
 # frozen_string_literal: true
 
 $LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
-require "model_context_protocol"
-require "model_context_protocol/transports/stdio"
+require "mcp"
+require "mcp/transports/stdio"
 
 # Create a simple tool
 class ExampleTool < MCP::Tool

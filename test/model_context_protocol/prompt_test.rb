@@ -3,7 +3,7 @@
 
 require "test_helper"
 
-module ModelContextProtocol
+module MCP
   class PromptTest < ActiveSupport::TestCase
     class TestPrompt < Prompt
       description "Test prompt"

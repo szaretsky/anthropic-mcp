@@ -4,7 +4,7 @@ require "json_rpc_handler"
 require_relative "instrumentation"
 require_relative "methods"
 
-module ModelContextProtocol
+module MCP
   class Server
     DEFAULT_VERSION = "0.1.0"
 
@@ -44,7 +44,7 @@ module ModelContextProtocol
       @resource_templates = resource_templates
       @resource_index = index_resources_by_uri(resources)
       @server_context = server_context
-      @configuration = ModelContextProtocol.configuration.merge(configuration)
+      @configuration = MCP.configuration.merge(configuration)
 
       @handlers = {
         Methods::RESOURCES_LIST => method(:list_resources),

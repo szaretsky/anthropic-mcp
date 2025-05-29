@@ -2,14 +2,14 @@
 
 require "test_helper"
 
-module ModelContextProtocol
+module MCP
   class InstrumentationTest < ActiveSupport::TestCase
     class Subject
       include Instrumentation
       attr_reader :instrumentation_data_received, :configuration
 
       def initialize
-        @configuration = ModelContextProtocol::Configuration.new
+        @configuration = MCP::Configuration.new
         @configuration.instrumentation_callback = ->(data) { @instrumentation_data_received = data }
       end
 

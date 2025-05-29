@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module ModelContextProtocol
+module MCP
   class Tool
     class Annotations
       attr_reader :title, :read_only_hint, :destructive_hint, :idempotent_hint, :open_world_hint

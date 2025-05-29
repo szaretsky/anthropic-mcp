@@ -5,7 +5,7 @@ require "test_helper"
 require "json"
 require "debug"
 
-module ModelContextProtocol
+module MCP
   class ServerTest < ActiveSupport::TestCase
     include InstrumentationTestHelper
     setup do
@@ -47,7 +47,7 @@ module ModelContextProtocol
       )
 
       @server_name = "test_server"
-      configuration = ModelContextProtocol::Configuration.new
+      configuration = MCP::Configuration.new
       configuration.instrumentation_callback = instrumentation_helper.callback
 
       @server = Server.new(
@@ -61,7 +61,7 @@ module ModelContextProtocol
       )
     end
 
-    # https://spec.modelcontextprotocol.io/specification/2025-03-26/basic/utilities/ping/#behavior-requirements
+    # https://spec.MCP.io/specification/2025-03-26/basic/utilities/ping/#behavior-requirements
     test "#handle ping request returns empty response" do
       request = {
         jsonrpc: "2.0",
@@ -655,14 +655,14 @@ module ModelContextProtocol
 
     test "the global configuration is used if no configuration is passed to the server" do
       server = Server.new(name: "test_server")
-      assert_equal ModelContextProtocol.configuration.instrumentation_callback,
+      assert_equal MCP.configuration.instrumentation_callback,
         server.configuration.instrumentation_callback
-      assert_equal ModelContextProtocol.configuration.exception_reporter,
+      assert_equal MCP.configuration.exception_reporter,
         server.configuration.exception_reporter
     end
 
     test "the server configuration takes precedence over the global configuration" do
-      configuration = ModelContextProtocol::Configuration.new
+      configuration = MCP::Configuration.new
       local_callback = ->(data) { puts "Local callback #{data.inspect}" }
       local_exception_reporter = ->(exception, server_context) {
         puts "Local exception reporter #{exception.inspect} #{server_context.inspect}"

@@ -1,7 +1,7 @@
 # typed: strict
 # frozen_string_literal: true
 
-module ModelContextProtocol
+module MCP
   class Prompt
     class << self
       NOT_SET = Object.new
@@ -67,7 +67,7 @@ module ModelContextProtocol
         missing = required_args - args.keys
         return if missing.empty?
 
-        raise ModelContextProtocol::Server::RequestHandlerError.new(
+        raise MCP::Server::RequestHandlerError.new(
           "Missing required arguments: #{missing.join(", ")}", nil, error_type: :missing_required_arguments
         )
       end

@@ -1,23 +1,20 @@
 ---
 description: writing changelog markdown when cutting a new release of the gem
-globs: 
+globs:
 alwaysApply: false
 ---
-- output the changelog as markdown when asked. 
+- output the changelog as markdown when asked.
 - git tags are used to mark the commit that cut a new release of the gem
-- the gem version is located in [version.rb](mdc:lib/model_context_protocol/version.rb)
+- the gem version is located in [version.rb](mdc:lib/mcp/version.rb)
 - use the git history, especially merge commits from PRs to construct the changelog
-- when necessary, look at the diff of files changed to determine whether a PR should be listed in 
+- when necessary, look at the diff of files changed to determine whether a PR should be listed in
   - ## Added; adds new functionality
   - ## Changed; alters functionality; especially backward compatible changes
-  - ## Fixed; bugfixes that are forward compatible 
+  - ## Fixed; bugfixes that are forward compatible
 
 use the following format for changelogs:
 
-https://cloudsmith.io/~shopify/repos/gems/packages/detail/ruby/mcp-ruby/{gem version}/
-
-# Changelog
-
+```
 ## Added
 - New functionality added that was not present before
 
@@ -25,8 +22,9 @@ https://cloudsmith.io/~shopify/repos/gems/packages/detail/ruby/mcp-ruby/{gem ver
 - Alterations to functionality that may indicate breaking changes
 
 ## Fixed
-- Bug fixes 
+- Bug fixes
 
 #### Full change list:
-- [Name of the PR #123](mdc:https:/github.com/Shopify/mcp-ruby/pull/123) @github-author-username 
-- [Name of the PR #456](mdc:https:/github.com/Shopify/mcp-ruby/pull/456) @another-github-author 
+- [Name of the PR #123](https:/github.com/modelcontextprotocol/ruby-sdk/pull/123) @github-author-username
+- [Name of the PR #456](https:/github.com/modelcontextprotocol/ruby-sdk/pull/456) @another-github-author
+```

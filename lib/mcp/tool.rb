@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module ModelContextProtocol
+module MCP
   class Tool
     class << self
       NOT_SET = Object.new

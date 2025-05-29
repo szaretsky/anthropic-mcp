@@ -2,9 +2,29 @@
 
 A Ruby gem for implementing Model Context Protocol servers
 
+## Installation
+
+Add this line to your application's Gemfile:
+
+```ruby
+gem 'mcp'
+```
+
+And then execute:
+
+```bash
+$ bundle install
+```
+
+Or install it yourself as:
+
+```bash
+$ gem install mcp
+```
+
 ## MCP Server
 
-The `ModelContextProtocol::Server` class is the core component that handles JSON-RPC requests and responses.
+The `MCP::Server` class is the core component that handles JSON-RPC requests and responses.
 It implements the Model Context Protocol specification, handling model context requests and responses.
 
 ### Key Features
@@ -44,19 +64,17 @@ requests.
 You can use the `Server#handle_json` method to handle requests.
 
 ```ruby
-module ModelContextProtocol
-  class ApplicationController < ActionController::Base
+class ApplicationController < ActionController::Base
 
-    def index
-      server = ModelContextProtocol::Server.new(
-        name: "my_server",
-        version: "1.0.0",
-        tools: [SomeTool, AnotherTool],
-        prompts: [MyPrompt],
-        server_context: { user_id: current_user.id },
-      )
-      render(json: server.handle_json(request.body.read).to_h)
-    end
+  def index
+    server = MCP::Server.new(
+      name: "my_server",
+      version: "1.0.0",
+      tools: [SomeTool, AnotherTool],
+      prompts: [MyPrompt],
+      server_context: { user_id: current_user.id },
+    )
+    render(json: server.handle_json(request.body.read))
   end
 end
 ```
@@ -67,11 +85,11 @@ If you want to build a local command-line application, you can use the stdio tra
 
 ```ruby
 #!/usr/bin/env ruby
-require "model_context_protocol"
-require "model_context_protocol/transports/stdio"
+require "mcp"
+require "mcp/transports/stdio"
 
 # Create a simple tool
-class ExampleTool < ModelContextProtocol::Tool
+class ExampleTool < MCP::Tool
   description "A simple example tool that echoes back its arguments"
   input_schema(
     properties: {
@@ -82,7 +100,7 @@ class ExampleTool < ModelContextProtocol::Tool
 
   class << self
     def call(message:, server_context:)
-      ModelContextProtocol::Tool::Response.new([{
+      MCP::Tool::Response.new([{
         type: "text",
         text: "Hello from example tool! Message: #{message}",
       }])
@@ -91,13 +109,13 @@ class ExampleTool < ModelContextProtocol::Tool
 end
 
 # Set up the server
-server = ModelContextProtocol::Server.new(
+server = MCP::Server.new(
   name: "example_server",
   tools: [ExampleTool],
 )
 
 # Create and start the transport
-transport = ModelContextProtocol::Transports::StdioTransport.new(server)
+transport = MCP::Transports::StdioTransport.new(server)
 transport.open
 ```
 
@@ -112,10 +130,10 @@ $ ./stdio_server.rb
 
 ## Configuration
 
-The gem can be configured using the `ModelContextProtocol.configure` block:
+The gem can be configured using the `MCP.configure` block:
 
 ```ruby
-ModelContextProtocol.configure do |config|
+MCP.configure do |config|
   config.exception_reporter = ->(exception, server_context) {
     # Your exception reporting logic here
     # For example with Bugsnag:
@@ -135,7 +153,7 @@ This is useful for systems where an application hosts more than one MCP server b
 they might require different instrumentation callbacks.
 
 ```ruby
-configuration = ModelContextProtocol::Configuration.new
+configuration = MCP::Configuration.new
 configuration.exception_reporter = ->(exception, server_context) {
   # Your exception reporting logic here
   # For example with Bugsnag:
@@ -148,7 +166,7 @@ configuration.instrumentation_callback = ->(data) {
   puts "Got instrumentation data #{data.inspect}"
 }
 
-server = ModelContextProtocol::Server.new(
+server = MCP::Server.new(
   # ... all other options
   configuration:,
 )
@@ -167,7 +185,7 @@ server_context: { [String, Symbol] => Any }
 
 **Example:**
 ```ruby
-server = ModelContextProtocol::Server.new(
+server = MCP::Server.new(
   name: "my_server",
   server_context: { user_id: current_user.id, request_id: request.uuid }
 )
@@ -218,13 +236,13 @@ config.instrumentation_callback = ->(data) {
 The server's protocol version can be overridden using the `protocol_version` class method:
 
 ```ruby
-ModelContextProtocol::Server.protocol_version = "2024-11-05"
+MCP::Server.protocol_version = "2024-11-05"
 ```
 
 This will make all new server instances use the specified protocol version instead of the default version. The protocol version can be reset to the default by setting it to `nil`:
 
 ```ruby
-ModelContextProtocol::Server.protocol_version = nil
+MCP::Server.protocol_version = nil
 ```
 
 Be sure to check the [MCP spec](https://spec.modelcontextprotocol.io/specification/2024-11-05/) for the protocol version to understand the supported features for the version being set.
@@ -253,12 +271,12 @@ If no exception reporter is configured, a default no-op reporter is used that si
 
 MCP spec includes [Tools](https://modelcontextprotocol.io/docs/concepts/tools) which provide functionality to LLM apps.
 
-This gem provides a `ModelContextProtocol::Tool` class that can be used to create tools in two ways:
+This gem provides a `MCP::Tool` class that can be used to create tools in two ways:
 
 1. As a class definition:
 
 ```ruby
-class MyTool < ModelContextProtocol::Tool
+class MyTool < MCP::Tool
   description "This tool performs specific functionality..."
   input_schema(
     properties: {
@@ -275,17 +293,17 @@ class MyTool < ModelContextProtocol::Tool
   )
 
   def self.call(message:, server_context:)
-    Tool::Response.new([{ type: "text", text: "OK" }])
+    MCP::Tool::Response.new([{ type: "text", text: "OK" }])
   end
 end
 
 tool = MyTool
 ```
 
-2. By using the `ModelContextProtocol::Tool.define` method with a block:
+2. By using the `MCP::Tool.define` method with a block:
 
 ```ruby
-tool = ModelContextProtocol::Tool.define(
+tool = MCP::Tool.define(
   name: "my_tool",
   description: "This tool performs specific functionality...",
   annotations: {
@@ -316,12 +334,12 @@ Annotations can be set either through the class definition using the `annotation
 
 MCP spec includes [Prompts](https://modelcontextprotocol.io/docs/concepts/prompts), which enable servers to define reusable prompt templates and workflows that clients can easily surface to users and LLMs.
 
-The `ModelContextProtocol::Prompt` class provides two ways to create prompts:
+The `MCP::Prompt` class provides two ways to create prompts:
 
 1. As a class definition with metadata:
 
 ```ruby
-class MyPrompt < ModelContextProtocol::Prompt
+class MyPrompt < MCP::Prompt
   prompt_name "my_prompt"  # Optional - defaults to underscored class name
   description "This prompt performs specific functionality..."
   arguments [
@@ -354,10 +372,10 @@ end
 prompt = MyPrompt
 ```
 
-2. Using the `ModelContextProtocol::Prompt.define` method:
+2. Using the `MCP::Prompt.define` method:
 
 ```ruby
-prompt = ModelContextProtocol::Prompt.define(
+prompt = MCP::Prompt.define(
   name: "my_prompt",
   description: "This prompt performs specific functionality...",
   arguments: [
@@ -399,7 +417,7 @@ e.g. around authentication state or user preferences.
 Register prompts with the MCP server:
 
 ```ruby
-server = ModelContextProtocol::Server.new(
+server = MCP::Server.new(
   name: "my_server",
   prompts: [MyPrompt],
   server_context: { user_id: current_user.id },
@@ -417,7 +435,7 @@ The server allows registering a callback to receive information about instrument
 To register a handler pass a proc/lambda to as `instrumentation_callback` into the server constructor.
 
 ```ruby
-ModelContextProtocol.configure do |config|
+MCP.configure do |config|
   config.instrumentation_callback = ->(data) {
     puts "Got instrumentation data #{data.inspect}"
   end
@@ -439,16 +457,16 @@ This is to avoid potential issues with metric cardinality
 
 MCP spec includes [Resources](https://modelcontextprotocol.io/docs/concepts/resources)
 
-The `ModelContextProtocol::Resource` class provides a way to register resources with the server.
+The `MCP::Resource` class provides a way to register resources with the server.
 
 ```ruby
-resource = ModelContextProtocol::Resource.new(
+resource = MCP::Resource.new(
   uri: "example.com/my_resource",
   mime_type: "text/plain",
   text: "Lorem ipsum dolor sit amet"
 )
 
-server = ModelContextProtocol::Server.new(
+server = MCP::Server.new(
   name: "my_server",
   resources: [resource],
 )

@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-require_relative "lib/model_context_protocol/version"
+require_relative "lib/mcp/version"
 
 Gem::Specification.new do |spec|
-  spec.name          = "model_context_protocol"
-  spec.version       = ModelContextProtocol::VERSION
+  spec.name          = "mcp"
+  spec.version       = MCP::VERSION
   spec.authors       = ["Model Context Protocol"]
   spec.email         = ["mcp-support@anthropic.com"]
 

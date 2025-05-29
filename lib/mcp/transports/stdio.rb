@@ -3,7 +3,7 @@
 require_relative "../transport"
 require "json"
 
-module ModelContextProtocol
+module MCP
   module Transports
     class StdioTransport < Transport
       def initialize(server)

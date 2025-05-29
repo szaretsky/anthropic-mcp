@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module ModelContextProtocol
+module MCP
   class Configuration
     DEFAULT_PROTOCOL_VERSION = "2024-11-05"
 
