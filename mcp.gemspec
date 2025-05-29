@@ -3,7 +3,7 @@
 require_relative "lib/model_context_protocol/version"
 
 Gem::Specification.new do |spec|
-  spec.name          = "model_context_protocol"
+  spec.name          = "mcp"
   spec.version       = ModelContextProtocol::VERSION
   spec.authors       = ["Model Context Protocol"]
   spec.email         = ["mcp-support@anthropic.com"]
