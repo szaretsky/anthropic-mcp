@@ -2,7 +2,7 @@
 
 require "test_helper"
 
-module ModelContextProtocol
+module MCP
   class Tool
     class InputSchemaTest < ActiveSupport::TestCase
       test "required arguments are converted to symbols" do

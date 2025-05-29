@@ -2,7 +2,7 @@
 
 require "test_helper"
 
-module ModelContextProtocol
+module MCP
   class StringUtilsTest < Minitest::Test
     def test_handle_from_class_name_returns_the_class_name_without_the_module_for_a_class_without_a_module
       assert_equal("test", StringUtils.handle_from_class_name("Test"))

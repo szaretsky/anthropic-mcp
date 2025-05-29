@@ -1,22 +1,23 @@
 # frozen_string_literal: true
 
 require_relative "mcp/server"
-require_relative "model_context_protocol/string_utils"
-require_relative "model_context_protocol/tool"
-require_relative "model_context_protocol/tool/input_schema"
-require_relative "model_context_protocol/tool/annotations"
-require_relative "model_context_protocol/tool/response"
-require_relative "model_context_protocol/content"
-require_relative "model_context_protocol/resource"
-require_relative "model_context_protocol/resource/contents"
-require_relative "model_context_protocol/resource/embedded"
-require_relative "model_context_protocol/resource_template"
-require_relative "model_context_protocol/prompt"
-require_relative "model_context_protocol/prompt/argument"
-require_relative "model_context_protocol/prompt/message"
-require_relative "model_context_protocol/prompt/result"
-require_relative "model_context_protocol/version"
-require_relative "model_context_protocol/configuration"
+require_relative "mcp/string_utils"
+require_relative "mcp/tool"
+require_relative "mcp/tool/input_schema"
+require_relative "mcp/tool/annotations"
+require_relative "mcp/tool/response"
+require_relative "mcp/content"
+require_relative "mcp/resource"
+require_relative "mcp/resource/contents"
+require_relative "mcp/resource/embedded"
+require_relative "mcp/resource_template"
+require_relative "mcp/prompt"
+require_relative "mcp/prompt/argument"
+require_relative "mcp/prompt/message"
+require_relative "mcp/prompt/result"
+require_relative "mcp/version"
+require_relative "mcp/configuration"
+require_relative "mcp/methods"
 
 module MCP
   class << self
@@ -38,5 +39,3 @@ module MCP
     end
   end
 end
-
-ModelContextProtocol = MCP

@@ -1,7 +1,7 @@
 # typed: true
 # frozen_string_literal: true
 
-module ModelContextProtocol
+module MCP
   module Content
     class Text
       attr_reader :text, :annotations

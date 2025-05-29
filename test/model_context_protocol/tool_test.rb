@@ -3,7 +3,7 @@
 
 require "test_helper"
 
-module ModelContextProtocol
+module MCP
   class ToolTest < ActiveSupport::TestCase
     class TestTool < Tool
       tool_name "test_tool"

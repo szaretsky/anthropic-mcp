@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module ModelContextProtocol
+module MCP
   class Transport
     def initialize(server)
       @server = server

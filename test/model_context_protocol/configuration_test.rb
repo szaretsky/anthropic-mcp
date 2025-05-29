@@ -2,7 +2,7 @@
 
 require "test_helper"
 
-module ModelContextProtocol
+module MCP
   class ConfigurationTest < ActiveSupport::TestCase
     test "initializes with a default no-op exception reporter" do
       config = Configuration.new

@@ -1,7 +1,7 @@
 # typed: strict
 # frozen_string_literal: true
 
-module ModelContextProtocol
+module MCP
   class Resource
     class Contents
       attr_reader :uri, :mime_type

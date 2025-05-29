@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module ModelContextProtocol
+module MCP
   module Instrumentation
     def instrument_call(method, &block)
       start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)

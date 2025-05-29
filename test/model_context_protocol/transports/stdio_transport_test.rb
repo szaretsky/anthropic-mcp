@@ -1,16 +1,16 @@
 # frozen_string_literal: true
 
 require "test_helper"
-require "model_context_protocol/transports/stdio"
+require "mcp/transports/stdio"
 require "json"
 
-module ModelContextProtocol
+module MCP
   module Transports
     class StdioTransportTest < ActiveSupport::TestCase
       include InstrumentationTestHelper
 
       setup do
-        configuration = ModelContextProtocol::Configuration.new
+        configuration = MCP::Configuration.new
         configuration.instrumentation_callback = instrumentation_helper.callback
         @server = Server.new(name: "test_server", configuration: configuration)
         @transport = StdioTransport.new(@server)

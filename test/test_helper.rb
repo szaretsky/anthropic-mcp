@@ -3,7 +3,7 @@
 ENV["RAILS_ENV"] ||= "test"
 
 require "bundler/setup"
-require "model_context_protocol"
+require "mcp"
 
 require "minitest/autorun"
 require "minitest/reporters"

@@ -1,7 +1,7 @@
 # typed: strict
 # frozen_string_literal: true
 
-module ModelContextProtocol
+module MCP
   class Prompt
     class Argument
       attr_reader :name, :description, :required, :arguments

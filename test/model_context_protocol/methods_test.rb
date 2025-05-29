@@ -3,7 +3,7 @@
 
 require "test_helper"
 
-module ModelContextProtocol
+module MCP
   class MethodsTest < ActiveSupport::TestCase
     test "ensure_capability! for tools/list method raises an error if tools capability is not present" do
       error = assert_raises(Methods::MissingRequiredCapabilityError) do

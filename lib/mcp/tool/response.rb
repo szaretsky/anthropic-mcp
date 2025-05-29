@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module ModelContextProtocol
+module MCP
   class Tool
     class Response
       attr_reader :content, :is_error

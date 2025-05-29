@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module ModelContextProtocol
+module MCP
   module Methods
     INITIALIZE = "initialize"
     PING = "ping"
