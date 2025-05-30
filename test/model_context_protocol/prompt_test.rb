@@ -67,7 +67,7 @@ module MCP
       assert_equal "a mock prompt for testing", prompt.description
       assert_equal "test_argument", prompt.arguments.first.name
       assert_equal "Test argument", prompt.arguments.first.description
-      assert_equal true, prompt.arguments.first.required
+      assert prompt.arguments.first.required
 
       expected_template_result = {
         description: "Hello, world!",
