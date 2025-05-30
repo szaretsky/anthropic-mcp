@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "../transport"
+require_relative "../../shared/transport"
 require "json"
 
 module MCP
