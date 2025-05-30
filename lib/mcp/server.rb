@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 require "json_rpc_handler"
-require_relative "shared/instrumentation"
-require_relative "shared/methods"
+require_relative "instrumentation"
+require_relative "methods"
 
 module MCP
   class Server
