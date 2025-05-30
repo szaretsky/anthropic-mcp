@@ -489,4 +489,12 @@ otherwise 'resources/read' requests will be a no-op.
 
 ## Releases
 
-TODO
+This gem is published to [RubyGems.org](https://rubygems.org/gems/mcp)
+
+Releases are triggered by PRs to the `main` branch updating the version number in `lib/mcp/version.rb`.
+
+1. **Update the version number** in `lib/mcp/version.rb`, following [semver](https://semver.org/)
+2. **Create A PR and get approval from a maintainer**
+3. **Merge your PR to the main branch** - This will automatically trigger the release workflow via GitHub Actions
+
+When changes are merged to the `main` branch, the GitHub Actions workflow (`.github/workflows/release.yml`) is triggered and the gem is published to RubyGems.
