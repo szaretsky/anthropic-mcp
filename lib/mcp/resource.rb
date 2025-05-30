@@ -5,7 +5,7 @@ module MCP
   class Resource
     attr_reader :uri, :name, :description, :mime_type
 
-    def initialize(uri:, name:, description:, mime_type:)
+    def initialize(uri:, name:, description: nil, mime_type: nil)
       @uri = uri
       @name = name
       @description = description
