@@ -4,7 +4,3 @@ inherit_gem:
 plugins:
   - rubocop-minitest
   - rubocop-rake
-
-Naming/FileName:
-  Exclude:
-    - 'lib/mcp-ruby.rb'
