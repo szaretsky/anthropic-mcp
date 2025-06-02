@@ -121,11 +121,10 @@ transport.open
 
 You can run this script and then type in requests to the server at the command line.
 
-```
-$ ./stdio_server.rb
-{"jsonrpc":"2.0","id":"1","result":"pong"}
-{"jsonrpc":"2.0","id":"2","result":["ExampleTool"]}
-{"jsonrpc":"2.0","id":"3","result":["ExampleTool"]}
+```bash
+$ ./examples/stdio_server.rb
+{"jsonrpc":"2.0","id":"1","method":"ping"}
+{"jsonrpc":"2.0","id":"2","method":"tools/list"}
 ```
 
 ## Configuration
