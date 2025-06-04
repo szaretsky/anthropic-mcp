@@ -1,13 +1,13 @@
 # frozen_string_literal: true
 
 require "test_helper"
-require "mcp/server/transports/stdio"
+require "mcp/server/transports/stdio_transport"
 require "json"
 
 module MCP
   class Server
     module Transports
-      class StdioTest < ActiveSupport::TestCase
+      class StdioTransportTest < ActiveSupport::TestCase
         include InstrumentationTestHelper
 
         setup do

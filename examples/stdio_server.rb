@@ -3,7 +3,7 @@
 
 $LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
 require "mcp"
-require "mcp/server/transports/stdio"
+require "mcp/server/transports/stdio_transport"
 
 # Create a simple tool
 class ExampleTool < MCP::Tool
